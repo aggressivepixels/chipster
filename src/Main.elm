@@ -22,7 +22,7 @@ main =
 
 
 type alias Model =
-    {}
+    { display : Display }
 
 
 type Msg
@@ -31,12 +31,14 @@ type Msg
 
 init : () -> ( Model, Cmd Msg )
 init () =
-    ( {}, Cmd.none )
+    ( { display = Set.fromList [ ( 0, 0 ), ( 1, 1 ), ( 2, 2 ) ] }
+    , Cmd.none
+    )
 
 
 view : Model -> Html Msg
-view _ =
-    viewDisplay (Set.fromList [ ( 0, 0 ), ( 1, 1 ), ( 2, 2 ) ])
+view model =
+    viewDisplay model.display
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
