@@ -128,63 +128,66 @@ fetchInstruction internals =
 
 runInstruction : Internals -> Int -> Result Error Internals
 runInstruction internals instruction =
-    if Bitwise.and instruction 0xF000 == 0x3000 then
+    let
+        op =
+            Bitwise.and instruction 0xF000
+                |> Bitwise.shiftRightZfBy 12
+
+        x =
+            Bitwise.and instruction 0x0F00
+                |> Bitwise.shiftRightZfBy 8
+
+        kk =
+            Bitwise.and instruction 0xFF
+
+        nnn =
+            Bitwise.and instruction 0x0FFF
+    in
+    case op of
         -- 3xkk - SE Vx, kk
-        let
-            register =
-                Bitwise.and instruction 0x0F00
-                    |> Bitwise.shiftRightZfBy 8
+        0x03 ->
+            Array.get x internals.registers
+                |> Result.fromMaybe InvalidRegister
+                |> Result.map
+                    (\val ->
+                        { internals
+                            | programCounter =
+                                internals.programCounter
+                                    + (if val == kk then
+                                        4
 
-            byte =
-                Bitwise.and instruction 0xFF
-        in
-        Array.get register internals.registers
-            |> Result.fromMaybe InvalidRegister
-            |> Result.map
-                (\value ->
-                    { internals
-                        | programCounter =
-                            if value == byte then
-                                internals.programCounter + 4
+                                       else
+                                        2
+                                      )
+                        }
+                    )
 
-                            else
-                                internals.programCounter + 2
-                    }
-                )
-
-    else if Bitwise.and instruction 0xF000 == 0xA000 then
         -- Annn - LD I, nnn
-        Ok
-            { internals
-                | indexRegister = Bitwise.and 0x0FFF instruction
-                , programCounter = internals.programCounter + 2
-            }
+        0x0A ->
+            Ok
+                { internals
+                    | indexRegister = nnn
+                    , programCounter = internals.programCounter + 2
+                }
 
-    else if Bitwise.and instruction 0xF000 == 0xC000 then
         -- Cxkk - RND Vx, kk
-        let
-            register =
-                Bitwise.and instruction 0x0F00
-                    |> Bitwise.shiftRightZfBy 8
+        0x0C ->
+            let
+                ( randomByte, newSeed ) =
+                    Random.step randomByteGenerator internals.seed
+            in
+            Ok
+                { internals
+                    | seed = newSeed
+                    , registers =
+                        Array.set x
+                            (Bitwise.and kk randomByte)
+                            internals.registers
+                    , programCounter = internals.programCounter + 2
+                }
 
-            byte =
-                Bitwise.and instruction 0xFF
-
-            ( randomByte, newSeed ) =
-                Random.step randomByteGenerator internals.seed
-        in
-        Ok
-            { internals
-                | seed = newSeed
-                , registers =
-                    Array.set register
-                        (Bitwise.and byte randomByte)
-                        internals.registers
-                , programCounter = internals.programCounter + 2
-            }
-
-    else
-        Err (InvalidInstruction instruction)
+        _ ->
+            Err (InvalidInstruction instruction)
 
 
 randomByteGenerator : Generator Int
