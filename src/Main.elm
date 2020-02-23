@@ -1,15 +1,57 @@
 module Main exposing (main)
 
 import Browser
+import Hex
 import Html exposing (Html)
-import Interpreter exposing (Interpreter)
+import Interpreter exposing (Error(..), Interpreter)
+import Json.Decode as Decode exposing (Value)
+import Time
+
+
+maze : List Int
+maze =
+    [ 0xA2
+    , 0x1E
+    , 0xC2
+    , 0x01
+    , 0x32
+    , 0x01
+    , 0xA2
+    , 0x1A
+    , 0xD0
+    , 0x14
+    , 0x70
+    , 0x04
+    , 0x30
+    , 0x40
+    , 0x12
+    , 0x00
+    , 0x60
+    , 0x00
+    , 0x71
+    , 0x04
+    , 0x31
+    , 0x20
+    , 0x12
+    , 0x00
+    , 0x12
+    , 0x18
+    , 0x80
+    , 0x40
+    , 0x20
+    , 0x10
+    , 0x20
+    , 0x40
+    , 0x80
+    , 0x10
+    ]
 
 
 
 -- TEA STUFF
 
 
-main : Program () Model Msg
+main : Program Value Model Msg
 main =
     Browser.element
         { init = init
@@ -19,19 +61,27 @@ main =
         }
 
 
-type Model
-    = Running Interpreter
-    | Crashed
+type Error
+    = NoInitialSeed
+    | InvalidProgram
+    | InterpreterError Interpreter.Error
+
+
+type alias Model =
+    Result Error Interpreter
 
 
 type Msg
-    = Msg
+    = Advance
 
 
-init : () -> ( Model, Cmd Msg )
-init () =
-    ( Maybe.map Running (Interpreter.fromProgram [ 0 ])
-        |> Maybe.withDefault Crashed
+init : Value -> ( Model, Cmd Msg )
+init value =
+    ( Decode.decodeValue Decode.int value
+        |> Result.mapError
+            (\_ -> NoInitialSeed)
+        |> Result.andThen
+            (Interpreter.init maze >> Result.fromMaybe InvalidProgram)
     , Cmd.none
     )
 
@@ -39,20 +89,40 @@ init () =
 view : Model -> Html Msg
 view model =
     case model of
-        Running interpreter ->
+        Ok interpreter ->
             Interpreter.view interpreter
 
-        Crashed ->
-            Html.text "The program was too big for the interpreter's memory"
+        Err InvalidProgram ->
+            Html.text "The program seems to be invalid"
+
+        Err NoInitialSeed ->
+            Html.text "The initial seed was not provided"
+
+        Err (InterpreterError MemoryOutOfBounds) ->
+            Html.text "The program attempted to access memory out of bounds"
+
+        Err (InterpreterError (InvalidInstruction instruction)) ->
+            Html.text
+                ("The program attempted to execute an invalid instruction: "
+                    ++ Hex.toHexString instruction
+                )
+
+        Err (InterpreterError InvalidRegister) ->
+            Html.text "The interpreter attempted to read an invalid register"
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
-        Msg ->
+    case ( model, msg ) of
+        ( Ok interpreter, Advance ) ->
+            ( Result.mapError InterpreterError (Interpreter.update interpreter)
+            , Cmd.none
+            )
+
+        _ ->
             ( model, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    Time.every 1000 (\_ -> Advance)
