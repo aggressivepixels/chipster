@@ -334,6 +334,27 @@ runInstruction state instruction =
                             , programCounter = state.programCounter + 2
                         }
 
+                0x04 ->
+                    let
+                        result =
+                            Registers.get x state.registers
+                                + Registers.get y state.registers
+                    in
+                    Ok
+                        { state
+                            | registers =
+                                state.registers
+                                    |> Registers.set x (modBy 256 result)
+                                    |> Registers.set 0x0F
+                                        (if result > 255 then
+                                            1
+
+                                         else
+                                            0
+                                        )
+                            , programCounter = state.programCounter + 2
+                        }
+
                 0x05 ->
                     let
                         result =
@@ -427,6 +448,12 @@ runInstruction state instruction =
 
         0x0F ->
             case kk of
+                0x0A ->
+                    Ok
+                        { state
+                            | status = WaitingForInput x
+                        }
+
                 0x1E ->
                     Ok
                         { state
@@ -436,10 +463,19 @@ runInstruction state instruction =
                             , programCounter = state.programCounter + 2
                         }
 
-                0x0A ->
+                0x33 ->
+                    let
+                        value =
+                            Registers.get x state.registers
+                    in
                     Ok
                         { state
-                            | status = WaitingForInput x
+                            | memory =
+                                state.memory
+                                    |> Memory.write (Address state.indexRegister) (value // 100)
+                                    |> Memory.write (Address (state.indexRegister + 1)) (modBy 10 (value // 10))
+                                    |> Memory.write (Address (state.indexRegister + 2)) (modBy 100 (modBy 10 value))
+                            , programCounter = state.programCounter + 2
                         }
 
                 0x55 ->
