@@ -143,8 +143,7 @@ update : Msg -> Interpreter -> Result Error Interpreter
 update msg (Interpreter state) =
     case ( msg, state.status ) of
         ( FramePassed _, _ ) ->
-            fetchInstruction state
-                |> runInstruction state
+            runCycles 10 state
                 |> Result.map Interpreter
 
         ( KeyPressed key, Running ) ->
@@ -173,6 +172,20 @@ update msg (Interpreter state) =
                         | keypad = Set.remove key state.keypad
                     }
                 )
+
+
+runCycles : Int -> State -> Result Error State
+runCycles count state =
+    if count <= 0 then
+        Ok state
+
+    else
+        case runInstruction state (fetchInstruction state) of
+            Ok newState ->
+                runCycles (count - 1) newState
+
+            Err err ->
+                Err err
 
 
 fetchInstruction : State -> Int
