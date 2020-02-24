@@ -8,6 +8,7 @@ module Interpreter exposing
 
 import Bitwise
 import Html exposing (Html)
+import List.Extra
 import Memory exposing (Address(..), Memory)
 import Random exposing (Generator, Seed)
 import Registers exposing (Registers)
@@ -256,27 +257,22 @@ runInstruction internals instruction =
 
 
 spriteFromRows : List Int -> List Pixel
-spriteFromRows rows =
-    -- TODO: Optimize this.
-    rows
-        |> List.indexedMap
-            (\x row ->
-                ( x
-                , List.indexedMap Tuple.pair (getBits 8 row)
-                )
-            )
-        |> List.concatMap
-            (\( x, row ) ->
-                List.map (\( y, on ) -> ( x, y, on )) row
-            )
-        |> List.filterMap
-            (\( x, y, on ) ->
-                if on then
-                    Just ( x, y )
+spriteFromRows =
+    List.Extra.indexedFoldl
+        (\y row spritePixels ->
+            spritePixels
+                ++ List.Extra.indexedFoldl
+                    (\x isOn rowPixels ->
+                        if isOn then
+                            ( x, y ) :: rowPixels
 
-                else
-                    Nothing
-            )
+                        else
+                            rowPixels
+                    )
+                    []
+                    (getBits 8 row)
+        )
+        []
 
 
 getBits : Int -> Int -> List Bool
@@ -285,19 +281,19 @@ getBits =
 
 
 getBitsHelp : List Bool -> Int -> Int -> List Bool
-getBitsHelp soFar count int =
+getBitsHelp spritePixels count int =
     if count <= 0 then
-        List.reverse soFar
+        List.reverse spritePixels
 
     else
         let
             mask =
                 Bitwise.shiftLeftBy (count - 1) 1
 
-            bit =
+            isOn =
                 Bitwise.and mask int /= 0
         in
-        getBitsHelp (bit :: soFar) (count - 1) int
+        getBitsHelp (isOn :: spritePixels) (count - 1) int
 
 
 randomByteGenerator : Generator Int
