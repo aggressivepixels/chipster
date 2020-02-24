@@ -79,8 +79,13 @@ update msg model =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Time.every 10 (\_ -> Advance)
+subscriptions model =
+    case model of
+        Ok _ ->
+            Time.every 10 (\_ -> Advance)
+
+        Err _ ->
+            Sub.none
 
 
 
