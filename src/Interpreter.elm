@@ -388,11 +388,27 @@ runInstruction state instruction =
 
                 union =
                     Set.union sprite state.display
+
+                intersection =
+                    Set.intersect sprite state.display
             in
-            -- TODO: Broken! Doesn't handle collisions.
             Ok
                 { state
-                    | display = union
+                    | display =
+                        if Set.isEmpty intersection then
+                            union
+
+                        else
+                            Set.diff union intersection
+                    , registers =
+                        Registers.set 0x0F
+                            (if Set.isEmpty union then
+                                0
+
+                             else
+                                1
+                            )
+                            state.registers
                     , programCounter = state.programCounter + 2
                 }
 
