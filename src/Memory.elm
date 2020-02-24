@@ -3,6 +3,7 @@ module Memory exposing
     , Memory
     , init
     , read
+    , readMany
     , write
     )
 
@@ -37,6 +38,24 @@ read (Address address) (Memory memory) =
 
     else
         Nothing
+
+
+readMany : Int -> Address -> Memory -> Maybe (List Int)
+readMany count (Address address) (Memory memory) =
+    readManyHelp [] count address memory
+
+
+readManyHelp : List Int -> Int -> Int -> Dict Int Int -> Maybe (List Int)
+readManyHelp soFar count address memory =
+    if count < 1 then
+        Just soFar
+
+    else
+        read (Address (address + count - 1)) (Memory memory)
+            |> Maybe.andThen
+                (\byte ->
+                    readManyHelp (byte :: soFar) (count - 1) address memory
+                )
 
 
 write : Address -> Int -> Memory -> Maybe Memory

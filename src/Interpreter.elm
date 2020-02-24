@@ -137,6 +137,13 @@ runInstruction internals instruction =
             Bitwise.and instruction 0x0F00
                 |> Bitwise.shiftRightZfBy 8
 
+        y =
+            Bitwise.and instruction 0xF0
+                |> Bitwise.shiftRightZfBy 4
+
+        n =
+            Bitwise.and instruction 0x0F
+
         kk =
             Bitwise.and instruction 0xFF
 
@@ -144,6 +151,10 @@ runInstruction internals instruction =
             Bitwise.and instruction 0x0FFF
     in
     case op of
+        -- 1nnn - JP nnn
+        0x01 ->
+            Ok { internals | programCounter = nnn }
+
         -- 3xkk - SE Vx, kk
         0x03 ->
             Array.get x internals.registers
@@ -159,6 +170,29 @@ runInstruction internals instruction =
                                        else
                                         2
                                       )
+                        }
+                    )
+
+        -- 6xkk - LD Vx, kk
+        0x06 ->
+            Ok
+                { internals
+                    | registers = Array.set x kk internals.registers
+                    , programCounter = internals.programCounter + 2
+                }
+
+        -- 7xkk - ADD Vx, kk
+        0x07 ->
+            Array.get x internals.registers
+                |> Result.fromMaybe InvalidRegister
+                |> Result.map
+                    (\val ->
+                        { internals
+                            | registers =
+                                Array.set x
+                                    (modBy 256 (val + kk))
+                                    internals.registers
+                            , programCounter = internals.programCounter + 2
                         }
                     )
 
@@ -186,8 +220,89 @@ runInstruction internals instruction =
                     , programCounter = internals.programCounter + 2
                 }
 
+        -- Dxyn - DRW Vx, Vy, n
+        0x0D ->
+            drawSprite x y n internals
+
         _ ->
             Err (InvalidInstruction instruction)
+
+
+drawSprite : Int -> Int -> Int -> Internals -> Result Error Internals
+drawSprite x y n internals =
+    Memory.readMany n (Address internals.indexRegister) internals.memory
+        |> Result.fromMaybe MemoryOutOfBounds
+        |> Result.map
+            (\rows ->
+                let
+                    sprite =
+                        spriteFromRows rows
+                            |> List.map
+                                (Tuple.mapBoth
+                                    ((+) (getWithDefault 0 x internals.registers))
+                                    ((+) (getWithDefault 0 y internals.registers))
+                                )
+                            |> Set.fromList
+
+                    union =
+                        Set.union sprite internals.display
+                in
+                -- TODO: Broken! Doesn't handle collision.
+                { internals
+                    | display = union
+                    , programCounter = internals.programCounter + 2
+                }
+            )
+
+
+getWithDefault : a -> Int -> Array a -> a
+getWithDefault default index array =
+    Maybe.withDefault default (Array.get index array)
+
+
+spriteFromRows : List Int -> List Pixel
+spriteFromRows rows =
+    -- TODO: Optimize this.
+    rows
+        |> List.indexedMap
+            (\x row ->
+                ( x
+                , List.indexedMap Tuple.pair (getBits 8 row)
+                )
+            )
+        |> List.concatMap
+            (\( x, row ) ->
+                List.map (\( y, on ) -> ( x, y, on )) row
+            )
+        |> List.filterMap
+            (\( x, y, on ) ->
+                if on then
+                    Just ( x, y )
+
+                else
+                    Nothing
+            )
+
+
+getBits : Int -> Int -> List Bool
+getBits =
+    getBitsHelp []
+
+
+getBitsHelp : List Bool -> Int -> Int -> List Bool
+getBitsHelp soFar count int =
+    if count <= 0 then
+        List.reverse soFar
+
+    else
+        let
+            mask =
+                Bitwise.shiftLeftBy (count - 1) 1
+
+            bit =
+                Bitwise.and mask int /= 0
+        in
+        getBitsHelp (bit :: soFar) (count - 1) int
 
 
 randomByteGenerator : Generator Int

@@ -125,4 +125,4 @@ update msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Time.every 1000 (\_ -> Advance)
+    Time.every 10 (\_ -> Advance)
