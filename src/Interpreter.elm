@@ -13,6 +13,7 @@ import Memory exposing (Address(..), Memory)
 import Random exposing (Generator, Seed)
 import Registers exposing (Registers)
 import Set exposing (Set)
+import Stack exposing (Stack)
 import Svg exposing (Svg)
 import Svg.Attributes as Attributes
 import Svg.Keyed as Keyed
@@ -30,6 +31,7 @@ type alias Internals =
     , display : Set Pixel
     , seed : Seed
     , registers : Registers
+    , stack : Stack
     }
 
 
@@ -57,6 +59,7 @@ init program seed =
                     , registers = Registers.init
                     , display = Set.empty
                     , seed = Random.initialSeed seed
+                    , stack = Stack.init
                     }
             )
 
@@ -166,6 +169,14 @@ runInstruction internals instruction =
         0x01 ->
             Ok { internals | programCounter = nnn }
 
+        -- 2nnn - CALL nnn
+        0x02 ->
+            Ok
+                { internals
+                    | programCounter = nnn
+                    , stack = Stack.push internals.programCounter internals.stack
+                }
+
         -- 3xkk - SE Vx, kk
         0x03 ->
             Ok
@@ -173,6 +184,20 @@ runInstruction internals instruction =
                     | programCounter =
                         internals.programCounter
                             + (if Registers.get x internals.registers == kk then
+                                4
+
+                               else
+                                2
+                              )
+                }
+
+        -- 4xkk - SNE Vx, kk
+        0x04 ->
+            Ok
+                { internals
+                    | programCounter =
+                        internals.programCounter
+                            + (if Registers.get x internals.registers /= kk then
                                 4
 
                                else
