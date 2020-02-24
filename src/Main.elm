@@ -31,7 +31,7 @@ type Model
 
 
 type Msg
-    = Advance
+    = InterpreterMsg Interpreter.Msg
 
 
 init : Value -> ( Model, Cmd Msg )
@@ -81,10 +81,10 @@ view model =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( model, msg ) of
-        ( Running oldInterpreter, Advance ) ->
+        ( Running oldInterpreter, InterpreterMsg interpreterMsg ) ->
             let
                 newModel =
-                    case Interpreter.update oldInterpreter of
+                    case Interpreter.update interpreterMsg oldInterpreter of
                         Ok newInterpreter ->
                             Running newInterpreter
 
@@ -100,8 +100,8 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model of
-        Running _ ->
-            Time.every 10 (\_ -> Advance)
+        Running interpreter ->
+            Sub.map InterpreterMsg (Interpreter.subscriptions interpreter)
 
         _ ->
             Sub.none

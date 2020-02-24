@@ -1,12 +1,15 @@
 module Interpreter exposing
     ( Error(..)
     , Interpreter
+    , Msg
     , init
+    , subscriptions
     , update
     , view
     )
 
 import Bitwise
+import Browser.Events as Events
 import Html exposing (Html)
 import List.Extra
 import Memory exposing (Address(..), Memory)
@@ -41,6 +44,10 @@ type alias Pixel =
 
 type Error
     = InvalidInstruction Int
+
+
+type Msg
+    = FramePassed Float
 
 
 
@@ -120,11 +127,13 @@ viewPixel ( x, y ) =
 -- UPDATE
 
 
-update : Interpreter -> Result Error Interpreter
-update (Interpreter internals) =
-    fetchInstruction internals
-        |> runInstruction internals
-        |> Result.map Interpreter
+update : Msg -> Interpreter -> Result Error Interpreter
+update msg (Interpreter internals) =
+    case msg of
+        FramePassed _ ->
+            fetchInstruction internals
+                |> runInstruction internals
+                |> Result.map Interpreter
 
 
 fetchInstruction : Internals -> Int
@@ -409,3 +418,12 @@ getBitsHelp spritePixels count int =
 randomByteGenerator : Generator Int
 randomByteGenerator =
     Random.int 0 255
+
+
+
+-- SUBSCRIPTIONS
+
+
+subscriptions : Interpreter -> Sub Msg
+subscriptions _ =
+    Sub.batch [ Events.onAnimationFrameDelta FramePassed ]
