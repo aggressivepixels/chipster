@@ -120,23 +120,21 @@ viewPixel ( x, y ) =
 update : Interpreter -> Result Error Interpreter
 update (Interpreter internals) =
     fetchInstruction internals
-        |> Result.fromMaybe MemoryOutOfBounds
-        |> Result.andThen (runInstruction internals)
+        |> runInstruction internals
         |> Result.map Interpreter
 
 
-fetchInstruction : Internals -> Maybe Int
+fetchInstruction : Internals -> Int
 fetchInstruction internals =
     let
         high =
             Memory.read (Address internals.programCounter) internals.memory
-                |> Maybe.map (Bitwise.shiftLeftBy 8)
+                |> Bitwise.shiftLeftBy 8
 
         low =
-            Memory.read (Address (internals.programCounter + 1))
-                internals.memory
+            Memory.read (Address (internals.programCounter + 1)) internals.memory
     in
-    Maybe.map2 Bitwise.or high low
+    Bitwise.or high low
 
 
 runInstruction : Internals -> Int -> Result Error Internals
@@ -228,37 +226,35 @@ runInstruction internals instruction =
 
         -- Dxyn - DRW Vx, Vy, n
         0x0D ->
-            drawSprite x y n internals
+            Ok (drawSprite x y n internals)
 
         _ ->
             Err (InvalidInstruction instruction)
 
 
-drawSprite : Int -> Int -> Int -> Internals -> Result Error Internals
+drawSprite : Int -> Int -> Int -> Internals -> Internals
 drawSprite x y n internals =
-    Memory.readMany n (Address internals.indexRegister) internals.memory
-        |> Result.fromMaybe MemoryOutOfBounds
-        |> Result.map
-            (\rows ->
-                let
-                    sprite =
-                        spriteFromRows rows
-                            |> List.map
-                                (Tuple.mapBoth
-                                    ((+) (Registers.get x internals.registers))
-                                    ((+) (Registers.get y internals.registers))
-                                )
-                            |> Set.fromList
+    let
+        rows =
+            Memory.readMany n (Address internals.indexRegister) internals.memory
 
-                    union =
-                        Set.union sprite internals.display
-                in
-                -- TODO: Broken! Doesn't handle collision.
-                { internals
-                    | display = union
-                    , programCounter = internals.programCounter + 2
-                }
-            )
+        sprite =
+            spriteFromRows rows
+                |> List.map
+                    (Tuple.mapBoth
+                        ((+) (Registers.get x internals.registers))
+                        ((+) (Registers.get y internals.registers))
+                    )
+                |> Set.fromList
+
+        union =
+            Set.union sprite internals.display
+    in
+    -- TODO: Broken! Doesn't handle collisions.
+    { internals
+        | display = union
+        , programCounter = internals.programCounter + 2
+    }
 
 
 spriteFromRows : List Int -> List Pixel
