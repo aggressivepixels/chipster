@@ -8,6 +8,85 @@ import Json.Decode as Decode exposing (Value)
 import Time
 
 
+
+-- TEA STUFF
+
+
+main : Program Value Model Msg
+main =
+    Browser.element
+        { init = init
+        , view = view
+        , update = update
+        , subscriptions = subscriptions
+        }
+
+
+type Error
+    = NoInitialSeed
+    | InvalidProgram
+    | InterpreterError Interpreter.Error
+
+
+type alias Model =
+    Result Error Interpreter
+
+
+type Msg
+    = Advance
+
+
+init : Value -> ( Model, Cmd Msg )
+init value =
+    ( Decode.decodeValue Decode.int value
+        |> Result.mapError
+            (\_ -> NoInitialSeed)
+        |> Result.andThen
+            (Interpreter.init kaleid >> Result.fromMaybe InvalidProgram)
+    , Cmd.none
+    )
+
+
+view : Model -> Html Msg
+view model =
+    case model of
+        Ok interpreter ->
+            Interpreter.view interpreter
+
+        Err InvalidProgram ->
+            Html.text "The program seems to be invalid"
+
+        Err NoInitialSeed ->
+            Html.text "The initial seed was not provided"
+
+        Err (InterpreterError (InvalidInstruction instruction)) ->
+            Html.text
+                ("The program attempted to execute an invalid instruction: "
+                    ++ Hex.toHexString instruction
+                )
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case ( model, msg ) of
+        ( Ok interpreter, Advance ) ->
+            ( Result.mapError InterpreterError (Interpreter.update interpreter)
+            , Cmd.none
+            )
+
+        _ ->
+            ( model, Cmd.none )
+
+
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    Time.every 10 (\_ -> Advance)
+
+
+
+-- GAMES
+
+
 maze : List Int
 maze =
     [ 0xA2
@@ -47,76 +126,126 @@ maze =
     ]
 
 
-
--- TEA STUFF
-
-
-main : Program Value Model Msg
-main =
-    Browser.element
-        { init = init
-        , view = view
-        , update = update
-        , subscriptions = subscriptions
-        }
-
-
-type Error
-    = NoInitialSeed
-    | InvalidProgram
-    | InterpreterError Interpreter.Error
-
-
-type alias Model =
-    Result Error Interpreter
-
-
-type Msg
-    = Advance
-
-
-init : Value -> ( Model, Cmd Msg )
-init value =
-    ( Decode.decodeValue Decode.int value
-        |> Result.mapError
-            (\_ -> NoInitialSeed)
-        |> Result.andThen
-            (Interpreter.init maze >> Result.fromMaybe InvalidProgram)
-    , Cmd.none
-    )
-
-
-view : Model -> Html Msg
-view model =
-    case model of
-        Ok interpreter ->
-            Interpreter.view interpreter
-
-        Err InvalidProgram ->
-            Html.text "The program seems to be invalid"
-
-        Err NoInitialSeed ->
-            Html.text "The initial seed was not provided"
-
-        Err (InterpreterError (InvalidInstruction instruction)) ->
-            Html.text
-                ("The program attempted to execute an invalid instruction: "
-                    ++ Hex.toHexString instruction
-                )
-
-
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case ( model, msg ) of
-        ( Ok interpreter, Advance ) ->
-            ( Result.mapError InterpreterError (Interpreter.update interpreter)
-            , Cmd.none
-            )
-
-        _ ->
-            ( model, Cmd.none )
-
-
-subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Time.every 10 (\_ -> Advance)
+kaleid : List Int
+kaleid =
+    [ 0x60
+    , 0x00
+    , 0x63
+    , 0x80
+    , 0x61
+    , 0x1F
+    , 0x62
+    , 0x0F
+    , 0x22
+    , 0x32
+    , 0xA2
+    , 0x00
+    , 0xF3
+    , 0x1E
+    , 0xF0
+    , 0x0A
+    , 0xF0
+    , 0x55
+    , 0x40
+    , 0x00
+    , 0x12
+    , 0x1C
+    , 0x73
+    , 0x01
+    , 0x33
+    , 0x00
+    , 0x12
+    , 0x08
+    , 0x63
+    , 0x80
+    , 0xA2
+    , 0x00
+    , 0xF3
+    , 0x1E
+    , 0xF0
+    , 0x65
+    , 0x40
+    , 0x00
+    , 0x12
+    , 0x1C
+    , 0x73
+    , 0x01
+    , 0x43
+    , 0x00
+    , 0x12
+    , 0x1C
+    , 0x22
+    , 0x32
+    , 0x12
+    , 0x1E
+    , 0x40
+    , 0x02
+    , 0x72
+    , 0xFF
+    , 0x40
+    , 0x04
+    , 0x71
+    , 0xFF
+    , 0x40
+    , 0x06
+    , 0x71
+    , 0x01
+    , 0x40
+    , 0x08
+    , 0x72
+    , 0x01
+    , 0xA2
+    , 0x77
+    , 0x6A
+    , 0xE0
+    , 0x8A
+    , 0x12
+    , 0x6B
+    , 0x1F
+    , 0x81
+    , 0xB2
+    , 0x3A
+    , 0x00
+    , 0x72
+    , 0x01
+    , 0x6A
+    , 0xF0
+    , 0x8A
+    , 0x22
+    , 0x6B
+    , 0x0F
+    , 0x82
+    , 0xB2
+    , 0x3A
+    , 0x00
+    , 0x71
+    , 0x01
+    , 0x6B
+    , 0x1F
+    , 0x81
+    , 0xB2
+    , 0xD1
+    , 0x21
+    , 0x8A
+    , 0x10
+    , 0x6B
+    , 0x1F
+    , 0x8B
+    , 0x25
+    , 0xDA
+    , 0xB1
+    , 0x6A
+    , 0x3F
+    , 0x8A
+    , 0x15
+    , 0xDA
+    , 0xB1
+    , 0x8B
+    , 0x20
+    , 0xDA
+    , 0xB1
+    , 0x00
+    , 0xEE
+    , 0x01
+    , 0x80
+    ]
