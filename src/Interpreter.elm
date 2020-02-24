@@ -196,7 +196,7 @@ runInstruction internals instruction =
                     | registers =
                         Registers.modify
                             x
-                            (\val -> modBy 256 (val + kk))
+                            ((+) kk >> modBy 256)
                             internals.registers
                     , programCounter = internals.programCounter + 2
                 }
