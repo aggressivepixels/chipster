@@ -165,6 +165,29 @@ runInstruction internals instruction =
             Bitwise.and instruction 0x0FFF
     in
     case op of
+        0x00 ->
+            case kk of
+                0xE0 ->
+                    Ok
+                        { internals
+                            | display = Set.empty
+                            , programCounter = internals.programCounter + 2
+                        }
+
+                0xEE ->
+                    let
+                        ( newProgramCounter, newStack ) =
+                            Stack.pop internals.stack
+                    in
+                    Ok
+                        { internals
+                            | stack = newStack
+                            , programCounter = newProgramCounter + 2
+                        }
+
+                _ ->
+                    Err (InvalidInstruction instruction)
+
         -- 1nnn - JP nnn
         0x01 ->
             Ok { internals | programCounter = nnn }
@@ -225,6 +248,55 @@ runInstruction internals instruction =
                     , programCounter = internals.programCounter + 2
                 }
 
+        0x08 ->
+            case n of
+                0x00 ->
+                    Ok
+                        { internals
+                            | registers =
+                                Registers.set x
+                                    (Registers.get y internals.registers)
+                                    internals.registers
+                            , programCounter = internals.programCounter + 2
+                        }
+
+                0x02 ->
+                    Ok
+                        { internals
+                            | registers =
+                                Registers.set x
+                                    (Bitwise.and
+                                        (Registers.get x internals.registers)
+                                        (Registers.get y internals.registers)
+                                    )
+                                    internals.registers
+                            , programCounter = internals.programCounter + 2
+                        }
+
+                0x05 ->
+                    let
+                        result =
+                            Registers.get x internals.registers
+                                - Registers.get y internals.registers
+                    in
+                    Ok
+                        { internals
+                            | registers =
+                                internals.registers
+                                    |> Registers.set x (modBy 256 result)
+                                    |> Registers.set 0x0F
+                                        (if result > 0 then
+                                            1
+
+                                         else
+                                            0
+                                        )
+                            , programCounter = internals.programCounter + 2
+                        }
+
+                _ ->
+                    Err (InvalidInstruction instruction)
+
         -- Annn - LD I, nnn
         0x0A ->
             Ok
@@ -275,6 +347,20 @@ runInstruction internals instruction =
                     | display = union
                     , programCounter = internals.programCounter + 2
                 }
+
+        0x0F ->
+            case kk of
+                0x1E ->
+                    Ok
+                        { internals
+                            | indexRegister =
+                                Registers.get x internals.registers
+                                    + internals.indexRegister
+                            , programCounter = internals.programCounter + 2
+                        }
+
+                _ ->
+                    Err (InvalidInstruction instruction)
 
         _ ->
             Err (InvalidInstruction instruction)
