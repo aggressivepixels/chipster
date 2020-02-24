@@ -38,6 +38,7 @@ type alias State =
     , stack : Stack
     , status : Status
     , keypad : Set Int
+    , delayTimer : Int
     }
 
 
@@ -79,6 +80,7 @@ init program seed =
                     , stack = Stack.init
                     , status = Running
                     , keypad = Set.empty
+                    , delayTimer = 0
                     }
             )
 
@@ -144,6 +146,7 @@ update msg (Interpreter state) =
     case ( msg, state.status ) of
         ( FramePassed _, _ ) ->
             runCycles 10 state
+                |> Result.map updateTimers
                 |> Result.map Interpreter
 
         ( KeyPressed key, Running ) ->
@@ -186,6 +189,11 @@ runCycles count state =
 
             Err err ->
                 Err err
+
+
+updateTimers : State -> State
+updateTimers state =
+    { state | delayTimer = max 0 (state.delayTimer - 1) }
 
 
 fetchInstruction : State -> Int
@@ -446,12 +454,44 @@ runInstruction state instruction =
                     , programCounter = state.programCounter + 2
                 }
 
+        0x0E ->
+            case kk of
+                0x9E ->
+                    Ok
+                        { state
+                            | programCounter =
+                                state.programCounter
+                                    + (if Set.member (Registers.get x state.registers) state.keypad then
+                                        4
+
+                                       else
+                                        2
+                                      )
+                        }
+
+                _ ->
+                    Err (InvalidInstruction instruction)
+
         0x0F ->
             case kk of
+                0x07 ->
+                    Ok
+                        { state
+                            | registers = Registers.set x state.delayTimer state.registers
+                            , programCounter = state.programCounter + 2
+                        }
+
                 0x0A ->
                     Ok
                         { state
                             | status = WaitingForInput x
+                        }
+
+                0x15 ->
+                    Ok
+                        { state
+                            | delayTimer = Registers.get x state.registers
+                            , programCounter = state.programCounter + 2
                         }
 
                 0x1E ->
@@ -460,6 +500,13 @@ runInstruction state instruction =
                             | indexRegister =
                                 Registers.get x state.registers
                                     + state.indexRegister
+                            , programCounter = state.programCounter + 2
+                        }
+
+                0x29 ->
+                    Ok
+                        { state
+                            | indexRegister = Registers.get x state.registers * 5
                             , programCounter = state.programCounter + 2
                         }
 

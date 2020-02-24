@@ -19,6 +19,99 @@ type Address
     = Address Int
 
 
+fontAddress : Int
+fontAddress =
+    0x80
+
+
+font : Dict Int Int
+font =
+    Dict.fromList
+        (List.indexedMap (\index value -> ( index + fontAddress, value ))
+            [ 0xF0
+            , 0x90
+            , 0x90
+            , 0x90
+            , 0xF0
+            , 0x20
+            , 0x60
+            , 0x20
+            , 0x20
+            , 0x70
+            , 0xF0
+            , 0x10
+            , 0xF0
+            , 0x80
+            , 0xF0
+            , 0xF0
+            , 0x10
+            , 0xF0
+            , 0x10
+            , 0xF0
+            , 0x90
+            , 0x90
+            , 0xF0
+            , 0x10
+            , 0x10
+            , 0xF0
+            , 0x80
+            , 0xF0
+            , 0x10
+            , 0xF0
+            , 0xF0
+            , 0x80
+            , 0xF0
+            , 0x90
+            , 0xF0
+            , 0xF0
+            , 0x10
+            , 0x20
+            , 0x40
+            , 0x40
+            , 0xF0
+            , 0x90
+            , 0xF0
+            , 0x90
+            , 0xF0
+            , 0xF0
+            , 0x90
+            , 0xF0
+            , 0x10
+            , 0xF0
+            , 0xF0
+            , 0x90
+            , 0xF0
+            , 0x90
+            , 0x90
+            , 0xE0
+            , 0x90
+            , 0xE0
+            , 0x90
+            , 0xE0
+            , 0xF0
+            , 0x80
+            , 0x80
+            , 0x80
+            , 0xF0
+            , 0xE0
+            , 0x90
+            , 0x90
+            , 0x90
+            , 0xE0
+            , 0xF0
+            , 0x80
+            , 0xF0
+            , 0x80
+            , 0xF0
+            , 0xF0
+            , 0x80
+            , 0xF0
+            , 0x80
+            , 0x80
+            ]
+        )
+
+
 init : List Int -> Maybe Memory
 init program =
     if List.length program < 4096 - 512 then
@@ -26,7 +119,7 @@ init program =
             indexedBytes =
                 List.indexedMap (\index byte -> ( 512 + index, byte )) program
         in
-        Just (Memory (Dict.fromList indexedBytes))
+        Just (Memory (Dict.union font (Dict.fromList indexedBytes)))
 
     else
         Nothing
