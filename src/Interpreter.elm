@@ -226,35 +226,33 @@ runInstruction internals instruction =
 
         -- Dxyn - DRW Vx, Vy, n
         0x0D ->
-            Ok (drawSprite x y n internals)
+            let
+                rows =
+                    Memory.readMany n
+                        (Address internals.indexRegister)
+                        internals.memory
+
+                sprite =
+                    spriteFromRows rows
+                        |> List.map
+                            (Tuple.mapBoth
+                                ((+) (Registers.get x internals.registers))
+                                ((+) (Registers.get y internals.registers))
+                            )
+                        |> Set.fromList
+
+                union =
+                    Set.union sprite internals.display
+            in
+            -- TODO: Broken! Doesn't handle collisions.
+            Ok
+                { internals
+                    | display = union
+                    , programCounter = internals.programCounter + 2
+                }
 
         _ ->
             Err (InvalidInstruction instruction)
-
-
-drawSprite : Int -> Int -> Int -> Internals -> Internals
-drawSprite x y n internals =
-    let
-        rows =
-            Memory.readMany n (Address internals.indexRegister) internals.memory
-
-        sprite =
-            spriteFromRows rows
-                |> List.map
-                    (Tuple.mapBoth
-                        ((+) (Registers.get x internals.registers))
-                        ((+) (Registers.get y internals.registers))
-                    )
-                |> Set.fromList
-
-        union =
-            Set.union sprite internals.display
-    in
-    -- TODO: Broken! Doesn't handle collisions.
-    { internals
-        | display = union
-        , programCounter = internals.programCounter + 2
-    }
 
 
 spriteFromRows : List Int -> List Pixel
