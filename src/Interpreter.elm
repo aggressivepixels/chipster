@@ -342,6 +342,19 @@ runInstruction state instruction =
                             , programCounter = state.programCounter + 2
                         }
 
+                0x03 ->
+                    Ok
+                        { state
+                            | registers =
+                                Registers.set x
+                                    (Bitwise.xor
+                                        (Registers.get x state.registers)
+                                        (Registers.get y state.registers)
+                                    )
+                                    state.registers
+                            , programCounter = state.programCounter + 2
+                        }
+
                 0x04 ->
                     let
                         result =
