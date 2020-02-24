@@ -41,8 +41,8 @@ init value =
             case Decode.decodeValue Decode.int value of
                 Ok seed ->
                     case Interpreter.init kaleid seed of
-                        Just oldInterpreter ->
-                            Running oldInterpreter
+                        Just interpreter ->
+                            Running interpreter
 
                         Nothing ->
                             InvalidProgram
@@ -58,8 +58,8 @@ init value =
 view : Model -> Html Msg
 view model =
     case model of
-        Running oldInterpreter ->
-            Interpreter.view oldInterpreter
+        Running interpreter ->
+            Interpreter.view interpreter
 
         InvalidProgram ->
             Html.text "The program seems to be invalid"
@@ -91,9 +91,7 @@ update msg model =
                         Err error ->
                             Crashed error oldInterpreter
             in
-            ( newModel
-            , Cmd.none
-            )
+            ( newModel, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
