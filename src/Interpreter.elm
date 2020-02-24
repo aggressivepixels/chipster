@@ -24,10 +24,10 @@ import Svg.Lazy exposing (lazy)
 
 
 type Interpreter
-    = Interpreter Internals
+    = Interpreter State
 
 
-type alias Internals =
+type alias State =
     { memory : Memory
     , programCounter : Int
     , indexRegister : Int
@@ -76,14 +76,14 @@ init program seed =
 
 
 view : Interpreter -> Html msg
-view (Interpreter internals) =
+view (Interpreter state) =
     Svg.svg
         [ Attributes.width "640"
         , Attributes.height "320"
         , Attributes.viewBox "0 0 64 32"
         ]
         [ viewBackground
-        , lazy viewDisplay internals.display
+        , lazy viewDisplay state.display
         ]
 
 
@@ -128,29 +128,29 @@ viewPixel ( x, y ) =
 
 
 update : Msg -> Interpreter -> Result Error Interpreter
-update msg (Interpreter internals) =
+update msg (Interpreter state) =
     case msg of
         FramePassed _ ->
-            fetchInstruction internals
-                |> runInstruction internals
+            fetchInstruction state
+                |> runInstruction state
                 |> Result.map Interpreter
 
 
-fetchInstruction : Internals -> Int
-fetchInstruction internals =
+fetchInstruction : State -> Int
+fetchInstruction state =
     let
         high =
-            Memory.read (Address internals.programCounter) internals.memory
+            Memory.read (Address state.programCounter) state.memory
                 |> Bitwise.shiftLeftBy 8
 
         low =
-            Memory.read (Address (internals.programCounter + 1)) internals.memory
+            Memory.read (Address (state.programCounter + 1)) state.memory
     in
     Bitwise.or high low
 
 
-runInstruction : Internals -> Int -> Result Error Internals
-runInstruction internals instruction =
+runInstruction : State -> Int -> Result Error State
+runInstruction state instruction =
     let
         op =
             Bitwise.and instruction 0xF000
@@ -178,18 +178,18 @@ runInstruction internals instruction =
             case kk of
                 0xE0 ->
                     Ok
-                        { internals
+                        { state
                             | display = Set.empty
-                            , programCounter = internals.programCounter + 2
+                            , programCounter = state.programCounter + 2
                         }
 
                 0xEE ->
                     let
                         ( newProgramCounter, newStack ) =
-                            Stack.pop internals.stack
+                            Stack.pop state.stack
                     in
                     Ok
-                        { internals
+                        { state
                             | stack = newStack
                             , programCounter = newProgramCounter + 2
                         }
@@ -199,23 +199,23 @@ runInstruction internals instruction =
 
         -- 1nnn - JP nnn
         0x01 ->
-            Ok { internals | programCounter = nnn }
+            Ok { state | programCounter = nnn }
 
         -- 2nnn - CALL nnn
         0x02 ->
             Ok
-                { internals
+                { state
                     | programCounter = nnn
-                    , stack = Stack.push internals.programCounter internals.stack
+                    , stack = Stack.push state.programCounter state.stack
                 }
 
         -- 3xkk - SE Vx, kk
         0x03 ->
             Ok
-                { internals
+                { state
                     | programCounter =
-                        internals.programCounter
-                            + (if Registers.get x internals.registers == kk then
+                        state.programCounter
+                            + (if Registers.get x state.registers == kk then
                                 4
 
                                else
@@ -226,10 +226,10 @@ runInstruction internals instruction =
         -- 4xkk - SNE Vx, kk
         0x04 ->
             Ok
-                { internals
+                { state
                     | programCounter =
-                        internals.programCounter
-                            + (if Registers.get x internals.registers /= kk then
+                        state.programCounter
+                            + (if Registers.get x state.registers /= kk then
                                 4
 
                                else
@@ -240,58 +240,58 @@ runInstruction internals instruction =
         -- 6xkk - LD Vx, kk
         0x06 ->
             Ok
-                { internals
-                    | registers = Registers.set x kk internals.registers
-                    , programCounter = internals.programCounter + 2
+                { state
+                    | registers = Registers.set x kk state.registers
+                    , programCounter = state.programCounter + 2
                 }
 
         -- 7xkk - ADD Vx, kk
         0x07 ->
             Ok
-                { internals
+                { state
                     | registers =
                         Registers.modify
                             x
                             ((+) kk >> modBy 256)
-                            internals.registers
-                    , programCounter = internals.programCounter + 2
+                            state.registers
+                    , programCounter = state.programCounter + 2
                 }
 
         0x08 ->
             case n of
                 0x00 ->
                     Ok
-                        { internals
+                        { state
                             | registers =
                                 Registers.set x
-                                    (Registers.get y internals.registers)
-                                    internals.registers
-                            , programCounter = internals.programCounter + 2
+                                    (Registers.get y state.registers)
+                                    state.registers
+                            , programCounter = state.programCounter + 2
                         }
 
                 0x02 ->
                     Ok
-                        { internals
+                        { state
                             | registers =
                                 Registers.set x
                                     (Bitwise.and
-                                        (Registers.get x internals.registers)
-                                        (Registers.get y internals.registers)
+                                        (Registers.get x state.registers)
+                                        (Registers.get y state.registers)
                                     )
-                                    internals.registers
-                            , programCounter = internals.programCounter + 2
+                                    state.registers
+                            , programCounter = state.programCounter + 2
                         }
 
                 0x05 ->
                     let
                         result =
-                            Registers.get x internals.registers
-                                - Registers.get y internals.registers
+                            Registers.get x state.registers
+                                - Registers.get y state.registers
                     in
                     Ok
-                        { internals
+                        { state
                             | registers =
-                                internals.registers
+                                state.registers
                                     |> Registers.set x (modBy 256 result)
                                     |> Registers.set 0x0F
                                         (if result > 0 then
@@ -300,7 +300,7 @@ runInstruction internals instruction =
                                          else
                                             0
                                         )
-                            , programCounter = internals.programCounter + 2
+                            , programCounter = state.programCounter + 2
                         }
 
                 _ ->
@@ -309,25 +309,25 @@ runInstruction internals instruction =
         -- Annn - LD I, nnn
         0x0A ->
             Ok
-                { internals
+                { state
                     | indexRegister = nnn
-                    , programCounter = internals.programCounter + 2
+                    , programCounter = state.programCounter + 2
                 }
 
         -- Cxkk - RND Vx, kk
         0x0C ->
             let
                 ( randomByte, newSeed ) =
-                    Random.step randomByteGenerator internals.seed
+                    Random.step randomByteGenerator state.seed
             in
             Ok
-                { internals
+                { state
                     | seed = newSeed
                     , registers =
                         Registers.set x
                             (Bitwise.and kk randomByte)
-                            internals.registers
-                    , programCounter = internals.programCounter + 2
+                            state.registers
+                    , programCounter = state.programCounter + 2
                 }
 
         -- Dxyn - DRW Vx, Vy, n
@@ -335,37 +335,37 @@ runInstruction internals instruction =
             let
                 rows =
                     Memory.readMany n
-                        (Address internals.indexRegister)
-                        internals.memory
+                        (Address state.indexRegister)
+                        state.memory
 
                 sprite =
                     spriteFromRows rows
                         |> List.map
                             (Tuple.mapBoth
-                                ((+) (Registers.get x internals.registers))
-                                ((+) (Registers.get y internals.registers))
+                                ((+) (Registers.get x state.registers))
+                                ((+) (Registers.get y state.registers))
                             )
                         |> Set.fromList
 
                 union =
-                    Set.union sprite internals.display
+                    Set.union sprite state.display
             in
             -- TODO: Broken! Doesn't handle collisions.
             Ok
-                { internals
+                { state
                     | display = union
-                    , programCounter = internals.programCounter + 2
+                    , programCounter = state.programCounter + 2
                 }
 
         0x0F ->
             case kk of
                 0x1E ->
                     Ok
-                        { internals
+                        { state
                             | indexRegister =
-                                Registers.get x internals.registers
-                                    + internals.indexRegister
-                            , programCounter = internals.programCounter + 2
+                                Registers.get x state.registers
+                                    + state.indexRegister
+                            , programCounter = state.programCounter + 2
                         }
 
                 _ ->
