@@ -14,6 +14,8 @@ import Random exposing (Generator, Seed)
 import Set exposing (Set)
 import Svg exposing (Svg)
 import Svg.Attributes as Attributes
+import Svg.Keyed as Keyed
+import Svg.Lazy exposing (lazy)
 
 
 type Interpreter
@@ -72,7 +74,7 @@ view (Interpreter internals) =
         , Attributes.viewBox "0 0 64 32"
         ]
         [ viewBackground
-        , Svg.g [] (List.map viewPixel (Set.toList internals.display))
+        , lazy viewDisplay internals.display
         ]
 
 
@@ -86,6 +88,18 @@ viewBackground =
         , Attributes.fill "black"
         ]
         []
+
+
+viewDisplay : Set Pixel -> Svg msg
+viewDisplay =
+    Set.toList >> List.map viewKeyedPixel >> Keyed.node "g" []
+
+
+viewKeyedPixel : Pixel -> ( String, Svg msg )
+viewKeyedPixel ( x, y ) =
+    ( String.fromInt x ++ "," ++ String.fromInt y
+    , lazy viewPixel ( x, y )
+    )
 
 
 viewPixel : Pixel -> Svg msg
