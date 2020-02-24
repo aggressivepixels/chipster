@@ -107,9 +107,6 @@ view model =
                     ++ Hex.toHexString instruction
                 )
 
-        Err (InterpreterError InvalidRegister) ->
-            Html.text "The interpreter attempted to read an invalid register"
-
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =

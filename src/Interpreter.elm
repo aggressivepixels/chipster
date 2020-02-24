@@ -6,11 +6,11 @@ module Interpreter exposing
     , view
     )
 
-import Array exposing (Array)
 import Bitwise
 import Html exposing (Html)
 import Memory exposing (Address(..), Memory)
 import Random exposing (Generator, Seed)
+import Registers exposing (Registers)
 import Set exposing (Set)
 import Svg exposing (Svg)
 import Svg.Attributes as Attributes
@@ -28,7 +28,7 @@ type alias Internals =
     , indexRegister : Int
     , display : Set Pixel
     , seed : Seed
-    , registers : Array Int
+    , registers : Registers
     }
 
 
@@ -39,7 +39,6 @@ type alias Pixel =
 type Error
     = MemoryOutOfBounds
     | InvalidInstruction Int
-    | InvalidRegister
 
 
 
@@ -55,7 +54,7 @@ init program seed =
                     { memory = memory
                     , programCounter = 512
                     , indexRegister = 0
-                    , registers = Array.repeat 16 0
+                    , registers = Registers.init
                     , display = Set.empty
                     , seed = Random.initialSeed seed
                     }
@@ -171,44 +170,37 @@ runInstruction internals instruction =
 
         -- 3xkk - SE Vx, kk
         0x03 ->
-            Array.get x internals.registers
-                |> Result.fromMaybe InvalidRegister
-                |> Result.map
-                    (\val ->
-                        { internals
-                            | programCounter =
-                                internals.programCounter
-                                    + (if val == kk then
-                                        4
+            Ok
+                { internals
+                    | programCounter =
+                        internals.programCounter
+                            + (if Registers.get x internals.registers == kk then
+                                4
 
-                                       else
-                                        2
-                                      )
-                        }
-                    )
+                               else
+                                2
+                              )
+                }
 
         -- 6xkk - LD Vx, kk
         0x06 ->
             Ok
                 { internals
-                    | registers = Array.set x kk internals.registers
+                    | registers = Registers.set x kk internals.registers
                     , programCounter = internals.programCounter + 2
                 }
 
         -- 7xkk - ADD Vx, kk
         0x07 ->
-            Array.get x internals.registers
-                |> Result.fromMaybe InvalidRegister
-                |> Result.map
-                    (\val ->
-                        { internals
-                            | registers =
-                                Array.set x
-                                    (modBy 256 (val + kk))
-                                    internals.registers
-                            , programCounter = internals.programCounter + 2
-                        }
-                    )
+            Ok
+                { internals
+                    | registers =
+                        Registers.modify
+                            x
+                            (\val -> modBy 256 (val + kk))
+                            internals.registers
+                    , programCounter = internals.programCounter + 2
+                }
 
         -- Annn - LD I, nnn
         0x0A ->
@@ -228,7 +220,7 @@ runInstruction internals instruction =
                 { internals
                     | seed = newSeed
                     , registers =
-                        Array.set x
+                        Registers.set x
                             (Bitwise.and kk randomByte)
                             internals.registers
                     , programCounter = internals.programCounter + 2
@@ -253,8 +245,8 @@ drawSprite x y n internals =
                         spriteFromRows rows
                             |> List.map
                                 (Tuple.mapBoth
-                                    ((+) (getWithDefault 0 x internals.registers))
-                                    ((+) (getWithDefault 0 y internals.registers))
+                                    ((+) (Registers.get x internals.registers))
+                                    ((+) (Registers.get y internals.registers))
                                 )
                             |> Set.fromList
 
@@ -267,11 +259,6 @@ drawSprite x y n internals =
                     , programCounter = internals.programCounter + 2
                 }
             )
-
-
-getWithDefault : a -> Int -> Array a -> a
-getWithDefault default index array =
-    Maybe.withDefault default (Array.get index array)
 
 
 spriteFromRows : List Int -> List Pixel
