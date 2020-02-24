@@ -1,6 +1,7 @@
 module Memory exposing
     ( Address(..)
     , Memory
+    , fontAddress
     , init
     , read
     , readMany

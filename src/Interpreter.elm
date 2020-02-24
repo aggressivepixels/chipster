@@ -506,7 +506,9 @@ runInstruction state instruction =
                 0x29 ->
                     Ok
                         { state
-                            | indexRegister = Registers.get x state.registers * 5
+                            | indexRegister =
+                                Memory.fontAddress
+                                    + (Registers.get x state.registers * 5)
                             , programCounter = state.programCounter + 2
                         }
 
