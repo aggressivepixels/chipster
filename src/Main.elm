@@ -3,6 +3,7 @@ module Main exposing (main)
 import Browser
 import Hex
 import Html exposing (Html)
+import Html.Attributes as Attributes
 import Interpreter exposing (Error(..), Interpreter)
 import Json.Decode as Decode exposing (Value)
 import Time
@@ -22,14 +23,11 @@ main =
         }
 
 
-type Error
-    = NoInitialSeed
+type Model
+    = InvalidSeed
     | InvalidProgram
-    | InterpreterError Interpreter.Error
-
-
-type alias Model =
-    Result Error Interpreter
+    | Running Interpreter
+    | Crashed Error Interpreter
 
 
 type Msg
@@ -38,11 +36,21 @@ type Msg
 
 init : Value -> ( Model, Cmd Msg )
 init value =
-    ( Decode.decodeValue Decode.int value
-        |> Result.mapError
-            (\_ -> NoInitialSeed)
-        |> Result.andThen
-            (Interpreter.init kaleid >> Result.fromMaybe InvalidProgram)
+    let
+        model =
+            case Decode.decodeValue Decode.int value of
+                Ok seed ->
+                    case Interpreter.init kaleid seed of
+                        Just oldInterpreter ->
+                            Running oldInterpreter
+
+                        Nothing ->
+                            InvalidProgram
+
+                Err _ ->
+                    InvalidSeed
+    in
+    ( model
     , Cmd.none
     )
 
@@ -50,27 +58,40 @@ init value =
 view : Model -> Html Msg
 view model =
     case model of
-        Ok interpreter ->
-            Interpreter.view interpreter
+        Running oldInterpreter ->
+            Interpreter.view oldInterpreter
 
-        Err InvalidProgram ->
+        InvalidProgram ->
             Html.text "The program seems to be invalid"
 
-        Err NoInitialSeed ->
-            Html.text "The initial seed was not provided"
+        InvalidSeed ->
+            Html.text "The initial seed was not provided or was not an integer"
 
-        Err (InterpreterError (InvalidInstruction instruction)) ->
-            Html.text
-                ("The program attempted to execute an invalid instruction: "
-                    ++ Hex.toHexString instruction
-                )
+        Crashed (InvalidInstruction instruction) oldInterpreter ->
+            Html.div []
+                [ Html.div [ Attributes.style "display" "block" ]
+                    [ Interpreter.view oldInterpreter ]
+                , Html.text
+                    ("The program attempted to execute an invalid instruction: "
+                        ++ Hex.toHexString instruction
+                    )
+                ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( model, msg ) of
-        ( Ok interpreter, Advance ) ->
-            ( Result.mapError InterpreterError (Interpreter.update interpreter)
+        ( Running oldInterpreter, Advance ) ->
+            let
+                newModel =
+                    case Interpreter.update oldInterpreter of
+                        Ok newInterpreter ->
+                            Running newInterpreter
+
+                        Err error ->
+                            Crashed error oldInterpreter
+            in
+            ( newModel
             , Cmd.none
             )
 
@@ -81,10 +102,10 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model of
-        Ok _ ->
+        Running _ ->
             Time.every 10 (\_ -> Advance)
 
-        Err _ ->
+        _ ->
             Sub.none
 
 
