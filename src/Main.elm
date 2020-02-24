@@ -98,9 +98,6 @@ view model =
         Err NoInitialSeed ->
             Html.text "The initial seed was not provided"
 
-        Err (InterpreterError MemoryOutOfBounds) ->
-            Html.text "The program attempted to access memory out of bounds"
-
         Err (InterpreterError (InvalidInstruction instruction)) ->
             Html.text
                 ("The program attempted to execute an invalid instruction: "

@@ -38,8 +38,7 @@ type alias Pixel =
 
 
 type Error
-    = MemoryOutOfBounds
-    | InvalidInstruction Int
+    = InvalidInstruction Int
 
 
 
