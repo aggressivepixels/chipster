@@ -11,6 +11,7 @@ module Interpreter exposing
 import Bitwise
 import Browser.Events as Events
 import Html exposing (Html)
+import Json.Decode as Decode exposing (Decoder)
 import List.Extra
 import Memory exposing (Address(..), Memory)
 import Random exposing (Generator, Seed)
@@ -35,11 +36,18 @@ type alias State =
     , seed : Seed
     , registers : Registers
     , stack : Stack
+    , status : Status
+    , keypad : Set Int
     }
 
 
 type alias Pixel =
     ( Int, Int )
+
+
+type Status
+    = Running
+    | WaitingForInput Int
 
 
 type Error
@@ -48,6 +56,8 @@ type Error
 
 type Msg
     = FramePassed Float
+    | KeyPressed Int
+    | KeyReleased Int
 
 
 
@@ -67,6 +77,8 @@ init program seed =
                     , display = Set.empty
                     , seed = Random.initialSeed seed
                     , stack = Stack.init
+                    , status = Running
+                    , keypad = Set.empty
                     }
             )
 
@@ -129,11 +141,38 @@ viewPixel ( x, y ) =
 
 update : Msg -> Interpreter -> Result Error Interpreter
 update msg (Interpreter state) =
-    case msg of
-        FramePassed _ ->
+    case ( msg, state.status ) of
+        ( FramePassed _, _ ) ->
             fetchInstruction state
                 |> runInstruction state
                 |> Result.map Interpreter
+
+        ( KeyPressed key, Running ) ->
+            Ok
+                (Interpreter
+                    { state
+                        | keypad = Set.insert key state.keypad
+                    }
+                )
+
+        ( KeyPressed key, WaitingForInput x ) ->
+            Ok
+                (Interpreter
+                    { state
+                        | keypad = Set.insert key state.keypad
+                        , registers = Registers.set x key state.registers
+                        , programCounter = state.programCounter + 2
+                        , status = Running
+                    }
+                )
+
+        ( KeyReleased key, _ ) ->
+            Ok
+                (Interpreter
+                    { state
+                        | keypad = Set.remove key state.keypad
+                    }
+                )
 
 
 fetchInstruction : State -> Int
@@ -368,6 +407,42 @@ runInstruction state instruction =
                             , programCounter = state.programCounter + 2
                         }
 
+                0x0A ->
+                    Ok
+                        { state
+                            | status = WaitingForInput x
+                        }
+
+                0x55 ->
+                    let
+                        registers =
+                            Registers.toList state.registers
+                                |> List.take (x + 1)
+                    in
+                    Ok
+                        { state
+                            | memory =
+                                Memory.writeMany (Address state.indexRegister)
+                                    registers
+                                    state.memory
+                            , programCounter = state.programCounter + 2
+                        }
+
+                0x65 ->
+                    Ok
+                        { state
+                            | registers =
+                                Memory.readMany (x + 1)
+                                    (Address state.indexRegister)
+                                    state.memory
+                                    |> List.Extra.indexedFoldl
+                                        (\index value registers ->
+                                            Registers.set index value registers
+                                        )
+                                        state.registers
+                            , programCounter = state.programCounter + 2
+                        }
+
                 _ ->
                     Err (InvalidInstruction instruction)
 
@@ -425,5 +500,86 @@ randomByteGenerator =
 
 
 subscriptions : Interpreter -> Sub Msg
-subscriptions _ =
-    Sub.batch [ Events.onAnimationFrameDelta FramePassed ]
+subscriptions (Interpreter state) =
+    case state.status of
+        Running ->
+            Sub.batch
+                [ Events.onAnimationFrameDelta FramePassed
+                , keyboardSubscriptions
+                ]
+
+        WaitingForInput _ ->
+            keyboardSubscriptions
+
+
+keyboardSubscriptions : Sub Msg
+keyboardSubscriptions =
+    Sub.batch
+        [ Events.onKeyDown (keyDecoder KeyPressed)
+        , Events.onKeyUp (keyDecoder KeyReleased)
+        ]
+
+
+keyDecoder : (Int -> msg) -> Decoder msg
+keyDecoder toMsg =
+    Decode.field "key" Decode.string
+        |> Decode.andThen (keyToMsg toMsg)
+
+
+keyToMsg : (Int -> msg) -> String -> Decoder msg
+keyToMsg toMsg string =
+    let
+        succeed =
+            Decode.succeed << toMsg
+    in
+    case String.toLower string of
+        "1" ->
+            succeed 0x01
+
+        "2" ->
+            succeed 0x02
+
+        "3" ->
+            succeed 0x03
+
+        "4" ->
+            succeed 0x0C
+
+        "q" ->
+            succeed 0x04
+
+        "w" ->
+            succeed 0x05
+
+        "e" ->
+            succeed 0x06
+
+        "r" ->
+            succeed 0x0D
+
+        "a" ->
+            succeed 0x07
+
+        "s" ->
+            succeed 0x08
+
+        "d" ->
+            succeed 0x09
+
+        "f" ->
+            succeed 0x0E
+
+        "z" ->
+            succeed 0x0A
+
+        "x" ->
+            succeed 0x00
+
+        "c" ->
+            succeed 0x0B
+
+        "v" ->
+            succeed 0x0F
+
+        _ ->
+            Decode.fail ("Not interested in " ++ string)

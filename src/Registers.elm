@@ -1,4 +1,11 @@
-module Registers exposing (Registers, get, init, modify, set)
+module Registers exposing
+    ( Registers
+    , get
+    , init
+    , modify
+    , set
+    , toList
+    )
 
 import Array exposing (Array)
 
@@ -30,3 +37,8 @@ modify index f (Registers registers) =
 set : Int -> Int -> Registers -> Registers
 set index value =
     modify index (\_ -> value)
+
+
+toList : Registers -> List Int
+toList (Registers registers) =
+    Array.toList registers

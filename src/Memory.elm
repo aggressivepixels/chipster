@@ -5,6 +5,7 @@ module Memory exposing
     , read
     , readMany
     , write
+    , writeMany
     )
 
 import Dict exposing (Dict)
@@ -65,3 +66,20 @@ write (Address address) byte (Memory memory) =
 
     else
         Memory memory
+
+
+writeMany : Address -> List Int -> Memory -> Memory
+writeMany (Address address) bytes memory =
+    writeManyHelp address (List.reverse bytes) memory
+
+
+writeManyHelp : Int -> List Int -> Memory -> Memory
+writeManyHelp address bytes memory =
+    case bytes of
+        [] ->
+            memory
+
+        x :: xs ->
+            writeManyHelp address
+                xs
+                (write (Address (address + List.length xs)) x memory)
