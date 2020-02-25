@@ -334,6 +334,19 @@ runInstruction state instruction =
                             , programCounter = state.programCounter + 2
                         }
 
+                0x01 ->
+                    Ok
+                        { state
+                            | registers =
+                                Registers.set x
+                                    (Bitwise.or
+                                        (Registers.get x state.registers)
+                                        (Registers.get y state.registers)
+                                    )
+                                    state.registers
+                            , programCounter = state.programCounter + 2
+                        }
+
                 0x02 ->
                     Ok
                         { state
@@ -399,6 +412,26 @@ runInstruction state instruction =
                                          else
                                             0
                                         )
+                            , programCounter = state.programCounter + 2
+                        }
+
+                0x06 ->
+                    Ok
+                        { state
+                            | registers =
+                                Registers.modify x
+                                    (Bitwise.shiftRightZfBy 1)
+                                    state.registers
+                            , programCounter = state.programCounter + 2
+                        }
+
+                0x0E ->
+                    Ok
+                        { state
+                            | registers =
+                                Registers.modify x
+                                    (Bitwise.shiftLeftBy 1)
+                                    state.registers
                             , programCounter = state.programCounter + 2
                         }
 
