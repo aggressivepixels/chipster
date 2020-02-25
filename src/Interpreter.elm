@@ -405,6 +405,23 @@ runInstruction state instruction =
                 _ ->
                     Err (InvalidInstruction instruction)
 
+        -- 9xy0 - SNE Vx, Vy
+        0x09 ->
+            Ok
+                { state
+                    | programCounter =
+                        state.programCounter
+                            + (if
+                                Registers.get x state.registers
+                                    /= Registers.get y state.registers
+                               then
+                                4
+
+                               else
+                                2
+                              )
+                }
+
         -- Annn - LD I, nnn
         0x0A ->
             Ok
