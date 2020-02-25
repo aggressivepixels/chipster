@@ -1,0 +1,30 @@
+html {
+  box-sizing: border-box;
+}
+
+*,
+*:before,
+*:after {
+  box-sizing: inherit;
+}
+
+body {
+  background: black;
+  color: whitesmoke;
+  font-family: monospace;
+}
+
+main {
+  margin: 0 auto;
+  max-width: 800px;
+}
+
+.interpreter-container {
+  margin: 0 auto;
+  width: fit-content;
+}
+
+.interpreter {
+  border: 1px gray solid;
+  display: block;
+}

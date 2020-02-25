@@ -77,25 +77,27 @@ init value =
 
 view : Model -> Html Msg
 view model =
-    case model of
-        Running interpreter ->
-            Interpreter.view interpreter
+    Html.main_ []
+        [ case model of
+            Running interpreter ->
+                Html.div [ Attributes.class "interpreter-container" ]
+                    [ Interpreter.view interpreter ]
 
-        InvalidProgram ->
-            Html.text "The program seems to be invalid"
+            InvalidProgram ->
+                Html.text "The program seems to be invalid"
 
-        InvalidSeed ->
-            Html.text "The initial seed was not provided or was not an integer"
+            InvalidSeed ->
+                Html.text "The initial seed was not provided or was not an integer"
 
-        Crashed (InvalidInstruction instruction) oldInterpreter ->
-            Html.div []
-                [ Html.div [ Attributes.style "display" "block" ]
-                    [ Interpreter.view oldInterpreter ]
-                , Html.text
-                    ("The program attempted to execute an invalid instruction: "
-                        ++ Hex.toHexString instruction
-                    )
-                ]
+            Crashed (InvalidInstruction instruction) oldInterpreter ->
+                Html.div [ Attributes.class "interpreter-container" ]
+                    [ Interpreter.view oldInterpreter
+                    , Html.text
+                        ("The program attempted to execute an invalid instruction: "
+                            ++ Hex.toHexString instruction
+                        )
+                    ]
+        ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )

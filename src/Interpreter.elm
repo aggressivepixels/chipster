@@ -97,6 +97,7 @@ view (Interpreter state) =
         [ Attributes.width "640"
         , Attributes.height "320"
         , Attributes.viewBox "0 0 64 32"
+        , Attributes.class "interpreter"
         ]
         [ viewBackground
         , lazy viewDisplay state.display
