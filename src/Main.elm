@@ -1,6 +1,10 @@
 module Main exposing (main)
 
 import Browser
+import Bytes exposing (Endianness(..))
+import Bytes.Decode exposing (Step(..))
+import File exposing (File)
+import File.Select as Select
 import Hex exposing (toHexString)
 import Html exposing (Html)
 import Html.Attributes as Attributes
@@ -9,6 +13,23 @@ import Interpreter exposing (Error(..), Interpreter)
 import Json.Decode as Decode exposing (Decoder, Value, decodeValue)
 import Task
 import Time
+
+
+fileBytes : Int -> Bytes.Decode.Decoder (List Int)
+fileBytes length =
+    Bytes.Decode.loop ( length, [] ) fileBytesStep
+
+
+fileBytesStep :
+    ( Int, List Int )
+    -> Bytes.Decode.Decoder (Step ( Int, List Int ) (List Int))
+fileBytesStep ( n, xs ) =
+    if n <= 0 then
+        Bytes.Decode.succeed (Done (List.reverse xs))
+
+    else
+        Bytes.Decode.map (\x -> Loop ( n - 1, x :: xs ))
+            Bytes.Decode.unsignedInt8
 
 
 type Flags
@@ -72,6 +93,9 @@ init value =
 type Msg
     = GameClicked Game
     | BackClicked
+    | LoadGameClicked
+    | GameLoaded File
+    | GameDecoded (Maybe Game)
     | SeedGenerated Int Game
     | InterpreterMsg Interpreter.Msg
 
@@ -111,6 +135,23 @@ update msg model =
         ( Valid games _, BackClicked ) ->
             ( Valid games Dashboard, Cmd.none )
 
+        ( Valid _ _, LoadGameClicked ) ->
+            ( model, Select.file [] GameLoaded )
+
+        ( Valid _ _, GameLoaded game ) ->
+            ( model
+            , File.toBytes game
+                |> Task.map
+                    (\bytes ->
+                        Bytes.Decode.decode (fileBytes (Bytes.width bytes)) bytes
+                            |> Maybe.map (\data -> Game (File.name game) data)
+                    )
+                |> Task.perform GameDecoded
+            )
+
+        ( Valid _ _, GameDecoded (Just game) ) ->
+            update (GameClicked game) model
+
         _ ->
             ( model, Cmd.none )
 
@@ -149,9 +190,16 @@ view model =
             { title = appName
             , body =
                 skeleton appName
-                    [ Html.p
+                    [ Html.p [] [ Html.text "Choose a game" ]
+                    , Html.div
                         [ Attributes.class "games" ]
                         (List.map viewGame games)
+                    , Html.p []
+                        [ Html.text "Or "
+                        , Html.a
+                            [ Attributes.href "#", Events.onClick LoadGameClicked ]
+                            [ Html.text "load your own" ]
+                        ]
                     ]
             }
 

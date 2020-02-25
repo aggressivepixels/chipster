@@ -33,7 +33,9 @@ a:hover {
 }
 
 .games {
-  width: 640px;
+  display: flex;
+  flex-wrap: wrap;
+  max-width: 640px;
 }
 
 .games a {
