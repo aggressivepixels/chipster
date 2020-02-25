@@ -297,6 +297,16 @@ runInstruction state instruction =
                     state
                 )
 
+        -- 5xy0 - SE Vx, Vy
+        ( 0x05, _, _ ) ->
+            Ok
+                (if vx == vy then
+                    nextInstruction state
+
+                 else
+                    state
+                )
+
         -- 6xkk - LD Vx, kk
         ( 0x06, _, _ ) ->
             Ok (setV kk x state)
@@ -393,6 +403,10 @@ runInstruction state instruction =
         -- Annn - LD I, nnn
         ( 0x0A, _, _ ) ->
             Ok (setI nnn state)
+
+        -- Bnnn - JP V0, nnn
+        ( 0x0B, _, _ ) ->
+            Ok (jumpTo (V.get 0 state.v + nnn) state)
 
         -- Cxkk - RND Vx, kk
         ( 0x0C, _, _ ) ->
