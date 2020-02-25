@@ -570,7 +570,7 @@ jumpTo addr state =
 
 pushStack : State -> State
 pushStack state =
-    { state | stack = Stack.push state.pc state.stack }
+    { state | stack = Stack.push (state.pc - 2) state.stack }
 
 
 modifyV : (Int -> Int) -> Int -> State -> State
