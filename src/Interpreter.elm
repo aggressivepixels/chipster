@@ -200,7 +200,7 @@ runCycles count state =
         Ok state
 
     else
-        case runInstruction state (fetchInstruction state) of
+        case runInstruction (nextInstruction state) (fetchInstruction state) of
             Ok newState ->
                 runCycles (count - 1) newState
 
@@ -262,15 +262,11 @@ runInstruction state instruction =
     case ( op, y, n ) of
         -- 00E0 - CLS
         ( 0x00, 0x0E, 0x00 ) ->
-            clearDisplay state
-                |> nextInstruction
-                |> Ok
+            Ok (clearDisplay state)
 
         -- 00EE - RET
         ( 0x00, 0x0E, 0x0E ) ->
-            popStack state
-                |> nextInstruction
-                |> Ok
+            Ok (popStack state)
 
         -- 1nnn - JP nnn
         ( 0x01, _, _ ) ->
@@ -284,61 +280,47 @@ runInstruction state instruction =
 
         -- 3xkk - SE Vx, kk
         ( 0x03, _, _ ) ->
-            nextInstruction state
-                |> (if xValue == kk then
-                        nextInstruction
+            Ok
+                (if xValue == kk then
+                    nextInstruction state
 
-                    else
-                        identity
-                   )
-                |> Ok
+                 else
+                    state
+                )
 
         -- 4xkk - SNE Vx, kk
         ( 0x04, _, _ ) ->
-            nextInstruction state
-                |> (if xValue /= kk then
-                        nextInstruction
+            Ok
+                (if xValue /= kk then
+                    nextInstruction state
 
-                    else
-                        identity
-                   )
-                |> Ok
+                 else
+                    state
+                )
 
         -- 6xkk - LD Vx, kk
         ( 0x06, _, _ ) ->
-            setRegister kk x state
-                |> nextInstruction
-                |> Ok
+            Ok (setRegister kk x state)
 
         -- 7xkk - ADD Vx, kk
         ( 0x07, _, _ ) ->
-            modifyRegister ((+) kk >> modBy 256) x state
-                |> nextInstruction
-                |> Ok
+            Ok (modifyRegister ((+) kk >> modBy 256) x state)
 
         -- 8xy0 - LD Vx, Vy
         ( 0x08, _, 0x00 ) ->
-            setRegister yValue x state
-                |> nextInstruction
-                |> Ok
+            Ok (setRegister yValue x state)
 
         -- 8xy1 - OR Vx, Vy
         ( 0x08, _, 0x01 ) ->
-            setRegister (Bitwise.or xValue yValue) x state
-                |> nextInstruction
-                |> Ok
+            Ok (setRegister (Bitwise.or xValue yValue) x state)
 
         -- 8xy2 - AND Vx, Vy
         ( 0x08, _, 0x02 ) ->
-            setRegister (Bitwise.and xValue yValue) x state
-                |> nextInstruction
-                |> Ok
+            Ok (setRegister (Bitwise.and xValue yValue) x state)
 
         -- 8xy3 - XOR Vx, Vy
         ( 0x08, _, 0x03 ) ->
-            setRegister (Bitwise.xor xValue yValue) x state
-                |> nextInstruction
-                |> Ok
+            Ok (setRegister (Bitwise.xor xValue yValue) x state)
 
         -- 8xy4 - ADD Vx, Vy
         ( 0x08, _, 0x04 ) ->
@@ -355,7 +337,6 @@ runInstruction state instruction =
                         0
                     )
                     0x0F
-                |> nextInstruction
                 |> Ok
 
         -- 8xy5 - SUB Vx, Vy
@@ -373,14 +354,11 @@ runInstruction state instruction =
                         0
                     )
                     0x0F
-                |> nextInstruction
                 |> Ok
 
         -- 8xy6 - SHR Vx
         ( 0x08, _, 0x06 ) ->
-            modifyRegister (Bitwise.shiftRightZfBy 1) x state
-                |> nextInstruction
-                |> Ok
+            Ok (modifyRegister (Bitwise.shiftRightZfBy 1) x state)
 
         -- 8xy7 - SUBN Vx, Vy
         ( 0x08, _, 0x07 ) ->
@@ -397,31 +375,25 @@ runInstruction state instruction =
                         0
                     )
                     0x0F
-                |> nextInstruction
                 |> Ok
 
         -- 8xyE - SHL Vx
         ( 0x08, _, 0x0E ) ->
-            modifyRegister (Bitwise.shiftLeftBy 1) x state
-                |> nextInstruction
-                |> Ok
+            Ok (modifyRegister (Bitwise.shiftLeftBy 1) x state)
 
         -- 9xy0 - SNE Vx, Vy
         ( 0x09, _, _ ) ->
-            nextInstruction state
-                |> (if xValue /= yValue then
-                        nextInstruction
+            Ok
+                (if xValue /= yValue then
+                    nextInstruction state
 
-                    else
-                        identity
-                   )
-                |> Ok
+                 else
+                    state
+                )
 
         -- Annn - LD I, nnn
         ( 0x0A, _, _ ) ->
-            setIndexRegister nnn state
-                |> nextInstruction
-                |> Ok
+            Ok (setIndexRegister nnn state)
 
         -- Cxkk - RND Vx, kk
         ( 0x0C, _, _ ) ->
@@ -429,9 +401,7 @@ runInstruction state instruction =
                 ( randomByte, newState ) =
                     stepSeed state
             in
-            setRegister (Bitwise.and kk randomByte) x newState
-                |> nextInstruction
-                |> Ok
+            Ok (setRegister (Bitwise.and kk randomByte) x newState)
 
         -- Dxyn - DRW Vx, Vy, n
         ( 0x0D, _, _ ) ->
@@ -452,53 +422,48 @@ runInstruction state instruction =
                 intersection =
                     Set.intersect sprite state.display
             in
-            { state
-                | display =
-                    if Set.isEmpty intersection then
-                        union
+            Ok
+                { state
+                    | display =
+                        if Set.isEmpty intersection then
+                            union
 
-                    else
-                        Set.diff union intersection
-                , registers =
-                    Registers.set 0x0F
-                        (if Set.isEmpty intersection then
-                            0
+                        else
+                            Set.diff union intersection
+                    , registers =
+                        Registers.set 0x0F
+                            (if Set.isEmpty intersection then
+                                0
 
-                         else
-                            1
-                        )
-                        state.registers
-            }
-                |> nextInstruction
-                |> Ok
+                             else
+                                1
+                            )
+                            state.registers
+                }
 
         -- Ex9E - SKP Vx
         ( 0x0E, 0x09, 0x0E ) ->
-            nextInstruction state
-                |> (if Set.member xValue state.keypad then
-                        nextInstruction
+            Ok
+                (if Set.member xValue state.keypad then
+                    nextInstruction state
 
-                    else
-                        identity
-                   )
-                |> Ok
+                 else
+                    state
+                )
 
         -- ExA1 - SKNP Vx
         ( 0x0E, 0x0A, 0x01 ) ->
-            nextInstruction state
-                |> (if not (Set.member xValue state.keypad) then
-                        nextInstruction
+            Ok
+                (if not (Set.member xValue state.keypad) then
+                    nextInstruction state
 
-                    else
-                        identity
-                   )
-                |> Ok
+                 else
+                    state
+                )
 
         -- Fx07 - LD Vx, DT
         ( 0x0F, 0x00, 0x07 ) ->
-            setRegister state.delayTimer x state
-                |> nextInstruction
-                |> Ok
+            Ok (setRegister state.delayTimer x state)
 
         -- Fx0A - LD Vx, K
         ( 0x0F, 0x00, 0x0A ) ->
@@ -506,27 +471,19 @@ runInstruction state instruction =
 
         -- Fx15 - LD DT, Vx
         ( 0x0F, 0x01, 0x05 ) ->
-            { state | delayTimer = Registers.get x state.registers }
-                |> nextInstruction
-                |> Ok
+            Ok { state | delayTimer = Registers.get x state.registers }
 
         -- Fx18 - LD ST, Vx
         ( 0x0F, 0x01, 0x08 ) ->
-            { state | soundTimer = Registers.get x state.registers }
-                |> nextInstruction
-                |> Ok
+            Ok { state | soundTimer = Registers.get x state.registers }
 
         -- Fx1E - ADD I, Vx
         ( 0x0F, 0x01, 0x0E ) ->
-            modifyIndexRegister ((+) xValue) state
-                |> nextInstruction
-                |> Ok
+            Ok (modifyIndexRegister ((+) xValue) state)
 
         -- Fx29 - LD F, Vx
         ( 0x0F, 0x02, 0x09 ) ->
-            setIndexRegister (Memory.fontAddress + (5 * xValue)) state
-                |> nextInstruction
-                |> Ok
+            Ok (setIndexRegister (Memory.fontAddress + (5 * xValue)) state)
 
         -- Fx33 - LD B, Vx
         ( 0x0F, 0x03, 0x03 ) ->
@@ -534,15 +491,14 @@ runInstruction state instruction =
                 write addr =
                     Memory.write (Address (state.indexRegister + addr))
             in
-            { state
-                | memory =
-                    state.memory
-                        |> write 0 (xValue // 100)
-                        |> write 1 (modBy 10 (xValue // 10))
-                        |> write 2 (modBy 100 (modBy 10 xValue))
-            }
-                |> nextInstruction
-                |> Ok
+            Ok
+                { state
+                    | memory =
+                        state.memory
+                            |> write 0 (xValue // 100)
+                            |> write 1 (modBy 10 (xValue // 10))
+                            |> write 2 (modBy 100 (modBy 10 xValue))
+                }
 
         -- Fx55 - LD [I], Vx
         ( 0x0F, 0x05, 0x05 ) ->
@@ -551,14 +507,13 @@ runInstruction state instruction =
                     Registers.toList state.registers
                         |> List.take (x + 1)
             in
-            { state
-                | memory =
-                    Memory.writeMany (Address state.indexRegister)
-                        registers
-                        state.memory
-            }
-                |> nextInstruction
-                |> Ok
+            Ok
+                { state
+                    | memory =
+                        Memory.writeMany (Address state.indexRegister)
+                            registers
+                            state.memory
+                }
 
         -- Fx65 - LD Vx, [I]
         ( 0x0F, 0x06, 0x05 ) ->
@@ -568,14 +523,13 @@ runInstruction state instruction =
                         (Address state.indexRegister)
                         state.memory
             in
-            { state
-                | registers =
-                    List.Extra.indexedFoldl Registers.set
-                        state.registers
-                        memoryRegisters
-            }
-                |> nextInstruction
-                |> Ok
+            Ok
+                { state
+                    | registers =
+                        List.Extra.indexedFoldl Registers.set
+                            state.registers
+                            memoryRegisters
+                }
 
         _ ->
             Err (InvalidInstruction instruction)
@@ -599,7 +553,7 @@ popStack state =
     in
     { state
         | stack = newStack
-        , programCounter = newProgramCounter
+        , programCounter = newProgramCounter + 2
     }
 
 
