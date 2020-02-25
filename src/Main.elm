@@ -1,18 +1,23 @@
 module Main exposing (main)
 
 import Browser
-import Hex
+import Hex exposing (toHexString)
 import Html exposing (Html)
 import Html.Attributes as Attributes
+import Html.Events as Events
 import Interpreter exposing (Error(..), Interpreter)
-import Json.Decode as Decode exposing (Decoder, Value)
+import Json.Decode as Decode exposing (Decoder, Value, decodeValue)
+import Task
+import Time
 
 
-flagsDecoder : Decoder ( Int, List Game )
+type Flags
+    = Flags Game (List Game)
+
+
+flagsDecoder : Decoder Flags
 flagsDecoder =
-    Decode.map2 Tuple.pair
-        (Decode.field "seed" Decode.int)
-        (Decode.field "games" (Decode.list gameDecoder))
+    Decode.oneOrMore Flags gameDecoder
 
 
 type alias Game =
@@ -28,13 +33,9 @@ gameDecoder =
         (Decode.field "data" (Decode.list Decode.int))
 
 
-
--- TEA STUFF
-
-
 main : Program Value Model Msg
 main =
-    Browser.element
+    Browser.document
         { init = init
         , view = view
         , update = update
@@ -43,77 +44,72 @@ main =
 
 
 type Model
-    = InvalidSeed
-    | InvalidProgram
-    | Running Interpreter
-    | Crashed Error Interpreter
+    = Invalid
+    | Valid (List Game) Page
 
 
-type Msg
-    = InterpreterMsg Interpreter.Msg
+type Page
+    = Dashboard
+    | InvalidProgram String
+    | Playing String Interpreter Status
+
+
+type Status
+    = Running
+    | Crashed Error
 
 
 init : Value -> ( Model, Cmd Msg )
 init value =
-    let
-        model =
-            case Decode.decodeValue flagsDecoder value of
-                Ok ( seed, x :: _ ) ->
-                    case Interpreter.init x.data seed of
-                        Just interpreter ->
-                            Running interpreter
+    case decodeValue flagsDecoder value of
+        Ok (Flags x xs) ->
+            ( Valid (x :: xs) Dashboard, Cmd.none )
 
-                        Nothing ->
-                            InvalidProgram
-
-                Ok _ ->
-                    InvalidProgram
-
-                Err _ ->
-                    InvalidSeed
-    in
-    ( model, Cmd.none )
+        Err _ ->
+            ( Invalid, Cmd.none )
 
 
-view : Model -> Html Msg
-view model =
-    Html.main_ []
-        [ case model of
-            Running interpreter ->
-                Html.div [ Attributes.class "interpreter-container" ]
-                    [ Interpreter.view interpreter ]
-
-            InvalidProgram ->
-                Html.text "The program seems to be invalid"
-
-            InvalidSeed ->
-                Html.text "The initial seed was not provided or was not an integer"
-
-            Crashed (InvalidInstruction instruction) oldInterpreter ->
-                Html.div [ Attributes.class "interpreter-container" ]
-                    [ Interpreter.view oldInterpreter
-                    , Html.text
-                        ("The program attempted to execute an invalid instruction: "
-                            ++ Hex.toHexString instruction
-                        )
-                    ]
-        ]
+type Msg
+    = GameClicked Game
+    | BackClicked
+    | SeedGenerated Int Game
+    | InterpreterMsg Interpreter.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( model, msg ) of
-        ( Running oldInterpreter, InterpreterMsg interpreterMsg ) ->
-            let
-                newModel =
-                    case Interpreter.update interpreterMsg oldInterpreter of
-                        Ok newInterpreter ->
-                            Running newInterpreter
+        ( Valid _ Dashboard, GameClicked game ) ->
+            ( model
+            , Task.perform
+                (\time ->
+                    SeedGenerated (Time.posixToMillis time) game
+                )
+                Time.now
+            )
 
-                        Err error ->
-                            Crashed error oldInterpreter
-            in
-            ( newModel, Cmd.none )
+        ( Valid games Dashboard, SeedGenerated seed game ) ->
+            case Interpreter.init game.data seed of
+                Just interpreter ->
+                    ( Valid games (Playing game.name interpreter Running)
+                    , Cmd.none
+                    )
+
+                Nothing ->
+                    ( Valid games (InvalidProgram game.name)
+                    , Cmd.none
+                    )
+
+        ( Valid games (Playing name oldInterpreter Running), InterpreterMsg interpreterMsg ) ->
+            case Interpreter.update interpreterMsg oldInterpreter of
+                Ok newInterpreter ->
+                    ( Valid games (Playing name newInterpreter Running), Cmd.none )
+
+                Err error ->
+                    ( Valid games (Playing name oldInterpreter (Crashed error)), Cmd.none )
+
+        ( Valid games _, BackClicked ) ->
+            ( Valid games Dashboard, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -122,8 +118,83 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model of
-        Running interpreter ->
+        Valid _ (Playing _ interpreter Running) ->
             Sub.map InterpreterMsg (Interpreter.subscriptions interpreter)
 
         _ ->
             Sub.none
+
+
+view : Model -> Browser.Document Msg
+view model =
+    let
+        appName =
+            "Chipster"
+
+        skeleton title content =
+            [ Html.main_ []
+                [ Html.h2 [] [ Html.text title ]
+                , Html.div [] content
+                ]
+            ]
+    in
+    case model of
+        Invalid ->
+            { title = appName
+            , body =
+                skeleton "An error has ocurred" []
+            }
+
+        Valid games Dashboard ->
+            { title = appName
+            , body =
+                skeleton appName (List.map viewGame games)
+            }
+
+        Valid _ (InvalidProgram name) ->
+            { title = name ++ " — " ++ appName
+            , body =
+                skeleton "Invalid program"
+                    [ viewBack
+                    , Html.text "That program seems to be invalid, try another one perhaps?"
+                    ]
+            }
+
+        Valid _ (Playing name interpreter status) ->
+            { title = name ++ " — " ++ appName
+            , body =
+                skeleton name
+                    [ viewBack
+                    , Html.div [ Attributes.class "interpreter" ]
+                        [ Interpreter.view interpreter
+                        ]
+                    , case status of
+                        Running ->
+                            Html.text ""
+
+                        Crashed (InvalidInstruction instruction) ->
+                            Html.p []
+                                [ Html.text
+                                    ("Invalid instruction: "
+                                        ++ toHexString instruction
+                                    )
+                                ]
+                    ]
+            }
+
+
+viewBack : Html Msg
+viewBack =
+    Html.p []
+        [ Html.a [ Attributes.href "#", Events.onClick BackClicked ]
+            [ Html.text "Go back" ]
+        ]
+
+
+viewGame : Game -> Html Msg
+viewGame game =
+    Html.a
+        [ Attributes.href "#"
+        , Events.onClick (GameClicked game)
+        ]
+        [ Html.text game.name ]

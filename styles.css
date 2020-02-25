@@ -16,15 +16,9 @@ body {
 
 main {
   margin: 0 auto;
-  max-width: 800px;
-}
-
-.interpreter-container {
-  margin: 0 auto;
   width: fit-content;
 }
 
 .interpreter {
   border: 1px gray solid;
-  display: block;
 }
