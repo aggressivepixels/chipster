@@ -22,7 +22,7 @@ type Address
 
 fontAddress : Int
 fontAddress =
-    0x80
+    0x50
 
 
 font : Dict Int Int
