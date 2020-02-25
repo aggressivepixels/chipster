@@ -1,0 +1,8 @@
+{
+  "name": "parcel-plugin-binary-asset",
+  "version": "0.1.0",
+  "main": "index.js",
+  "dependencies": {
+    "parcel-bundler": "^1.12.4"
+  }
+}
