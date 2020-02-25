@@ -252,268 +252,185 @@ runInstruction state instruction =
 
         nnn =
             Bitwise.and instruction 0x0FFF
+
+        xValue =
+            Registers.get x state.registers
+
+        yValue =
+            Registers.get y state.registers
     in
     case op of
         0x00 ->
             case kk of
                 0xE0 ->
-                    Ok
-                        { state
-                            | display = Set.empty
-                            , programCounter = state.programCounter + 2
-                        }
+                    clearDisplay state
+                        |> nextInstruction
+                        |> Ok
 
                 0xEE ->
-                    let
-                        ( newProgramCounter, newStack ) =
-                            Stack.pop state.stack
-                    in
-                    Ok
-                        { state
-                            | stack = newStack
-                            , programCounter = newProgramCounter + 2
-                        }
+                    popStack state
+                        |> nextInstruction
+                        |> Ok
 
                 _ ->
                     Err (InvalidInstruction instruction)
 
         -- 1nnn - JP nnn
         0x01 ->
-            Ok { state | programCounter = nnn }
+            Ok (jumpTo nnn state)
 
         -- 2nnn - CALL nnn
         0x02 ->
-            Ok
-                { state
-                    | programCounter = nnn
-                    , stack = Stack.push state.programCounter state.stack
-                }
+            pushStack state
+                |> jumpTo nnn
+                |> Ok
 
         -- 3xkk - SE Vx, kk
         0x03 ->
-            Ok
-                { state
-                    | programCounter =
-                        state.programCounter
-                            + (if Registers.get x state.registers == kk then
-                                4
+            nextInstruction state
+                |> (if xValue == kk then
+                        nextInstruction
 
-                               else
-                                2
-                              )
-                }
+                    else
+                        identity
+                   )
+                |> Ok
 
         -- 4xkk - SNE Vx, kk
         0x04 ->
-            Ok
-                { state
-                    | programCounter =
-                        state.programCounter
-                            + (if Registers.get x state.registers /= kk then
-                                4
+            nextInstruction state
+                |> (if xValue /= kk then
+                        nextInstruction
 
-                               else
-                                2
-                              )
-                }
+                    else
+                        identity
+                   )
+                |> Ok
 
         -- 6xkk - LD Vx, kk
         0x06 ->
-            Ok
-                { state
-                    | registers = Registers.set x kk state.registers
-                    , programCounter = state.programCounter + 2
-                }
+            setRegister kk x state
+                |> nextInstruction
+                |> Ok
 
         -- 7xkk - ADD Vx, kk
         0x07 ->
-            Ok
-                { state
-                    | registers =
-                        Registers.modify
-                            x
-                            ((+) kk >> modBy 256)
-                            state.registers
-                    , programCounter = state.programCounter + 2
-                }
+            modifyRegister ((+) kk >> modBy 256) x state
+                |> nextInstruction
+                |> Ok
 
         0x08 ->
             case n of
                 0x00 ->
-                    Ok
-                        { state
-                            | registers =
-                                Registers.set x
-                                    (Registers.get y state.registers)
-                                    state.registers
-                            , programCounter = state.programCounter + 2
-                        }
+                    setRegister yValue x state
+                        |> nextInstruction
+                        |> Ok
 
                 0x01 ->
-                    Ok
-                        { state
-                            | registers =
-                                Registers.set x
-                                    (Bitwise.or
-                                        (Registers.get x state.registers)
-                                        (Registers.get y state.registers)
-                                    )
-                                    state.registers
-                            , programCounter = state.programCounter + 2
-                        }
+                    setRegister (Bitwise.or xValue yValue) x state
+                        |> nextInstruction
+                        |> Ok
 
                 0x02 ->
-                    Ok
-                        { state
-                            | registers =
-                                Registers.set x
-                                    (Bitwise.and
-                                        (Registers.get x state.registers)
-                                        (Registers.get y state.registers)
-                                    )
-                                    state.registers
-                            , programCounter = state.programCounter + 2
-                        }
+                    setRegister (Bitwise.and xValue yValue) x state
+                        |> nextInstruction
+                        |> Ok
 
                 0x03 ->
-                    Ok
-                        { state
-                            | registers =
-                                Registers.set x
-                                    (Bitwise.xor
-                                        (Registers.get x state.registers)
-                                        (Registers.get y state.registers)
-                                    )
-                                    state.registers
-                            , programCounter = state.programCounter + 2
-                        }
+                    setRegister (Bitwise.xor xValue yValue) x state
+                        |> nextInstruction
+                        |> Ok
 
                 0x04 ->
                     let
                         result =
-                            Registers.get x state.registers
-                                + Registers.get y state.registers
+                            xValue + yValue
                     in
-                    Ok
-                        { state
-                            | registers =
-                                state.registers
-                                    |> Registers.set x (modBy 256 result)
-                                    |> Registers.set 0x0F
-                                        (if result > 255 then
-                                            1
+                    setRegister (modBy 256 result) x state
+                        |> setRegister
+                            (if result > 255 then
+                                1
 
-                                         else
-                                            0
-                                        )
-                            , programCounter = state.programCounter + 2
-                        }
+                             else
+                                0
+                            )
+                            0x0F
+                        |> nextInstruction
+                        |> Ok
 
                 0x05 ->
                     let
                         result =
-                            Registers.get x state.registers
-                                - Registers.get y state.registers
+                            xValue - yValue
                     in
-                    Ok
-                        { state
-                            | registers =
-                                state.registers
-                                    |> Registers.set x (modBy 256 result)
-                                    |> Registers.set 0x0F
-                                        (if result > 0 then
-                                            1
+                    setRegister (modBy 256 result) x state
+                        |> setRegister
+                            (if result > 0 then
+                                1
 
-                                         else
-                                            0
-                                        )
-                            , programCounter = state.programCounter + 2
-                        }
+                             else
+                                0
+                            )
+                            0x0F
+                        |> nextInstruction
+                        |> Ok
 
                 0x06 ->
-                    Ok
-                        { state
-                            | registers =
-                                Registers.modify x
-                                    (Bitwise.shiftRightZfBy 1)
-                                    state.registers
-                            , programCounter = state.programCounter + 2
-                        }
+                    modifyRegister (Bitwise.shiftRightZfBy 1) x state
+                        |> nextInstruction
+                        |> Ok
 
                 0x07 ->
                     let
                         result =
-                            Registers.get y state.registers
-                                - Registers.get x state.registers
+                            yValue - xValue
                     in
-                    Ok
-                        { state
-                            | registers =
-                                state.registers
-                                    |> Registers.set x (modBy 256 result)
-                                    |> Registers.set 0x0F
-                                        (if result > 0 then
-                                            1
+                    setRegister (modBy 256 result) x state
+                        |> setRegister
+                            (if result > 0 then
+                                1
 
-                                         else
-                                            0
-                                        )
-                            , programCounter = state.programCounter + 2
-                        }
+                             else
+                                0
+                            )
+                            0x0F
+                        |> nextInstruction
+                        |> Ok
 
                 0x0E ->
-                    Ok
-                        { state
-                            | registers =
-                                Registers.modify x
-                                    (Bitwise.shiftLeftBy 1)
-                                    state.registers
-                            , programCounter = state.programCounter + 2
-                        }
+                    modifyRegister (Bitwise.shiftLeftBy 1) x state
+                        |> nextInstruction
+                        |> Ok
 
                 _ ->
                     Err (InvalidInstruction instruction)
 
         -- 9xy0 - SNE Vx, Vy
         0x09 ->
-            Ok
-                { state
-                    | programCounter =
-                        state.programCounter
-                            + (if
-                                Registers.get x state.registers
-                                    /= Registers.get y state.registers
-                               then
-                                4
+            nextInstruction state
+                |> (if xValue /= yValue then
+                        nextInstruction
 
-                               else
-                                2
-                              )
-                }
+                    else
+                        identity
+                   )
+                |> Ok
 
         -- Annn - LD I, nnn
         0x0A ->
-            Ok
-                { state
-                    | indexRegister = nnn
-                    , programCounter = state.programCounter + 2
-                }
+            setIndexRegister nnn state
+                |> nextInstruction
+                |> Ok
 
         -- Cxkk - RND Vx, kk
         0x0C ->
             let
-                ( randomByte, newSeed ) =
-                    Random.step randomByteGenerator state.seed
+                ( randomByte, newState ) =
+                    stepSeed state
             in
-            Ok
-                { state
-                    | seed = newSeed
-                    , registers =
-                        Registers.set x
-                            (Bitwise.and kk randomByte)
-                            state.registers
-                    , programCounter = state.programCounter + 2
-                }
+            setRegister (Bitwise.and kk randomByte) x newState
+                |> nextInstruction
+                |> Ok
 
         -- Dxyn - DRW Vx, Vy, n
         0x0D ->
@@ -525,11 +442,7 @@ runInstruction state instruction =
 
                 sprite =
                     spriteFromRows rows
-                        |> List.map
-                            (Tuple.mapBoth
-                                ((+) (Registers.get x state.registers))
-                                ((+) (Registers.get y state.registers))
-                            )
+                        |> List.map (Tuple.mapBoth ((+) xValue) ((+) yValue))
                         |> Set.fromList
 
                 union =
@@ -538,53 +451,47 @@ runInstruction state instruction =
                 intersection =
                     Set.intersect sprite state.display
             in
-            Ok
-                { state
-                    | display =
-                        if Set.isEmpty intersection then
-                            union
+            { state
+                | display =
+                    if Set.isEmpty intersection then
+                        union
 
-                        else
-                            Set.diff union intersection
-                    , registers =
-                        Registers.set 0x0F
-                            (if Set.isEmpty intersection then
-                                0
+                    else
+                        Set.diff union intersection
+                , registers =
+                    Registers.set 0x0F
+                        (if Set.isEmpty intersection then
+                            0
 
-                             else
-                                1
-                            )
-                            state.registers
-                    , programCounter = state.programCounter + 2
-                }
+                         else
+                            1
+                        )
+                        state.registers
+            }
+                |> nextInstruction
+                |> Ok
 
         0x0E ->
             case kk of
                 0x9E ->
-                    Ok
-                        { state
-                            | programCounter =
-                                state.programCounter
-                                    + (if Set.member (Registers.get x state.registers) state.keypad then
-                                        4
+                    nextInstruction state
+                        |> (if Set.member xValue state.keypad then
+                                nextInstruction
 
-                                       else
-                                        2
-                                      )
-                        }
+                            else
+                                identity
+                           )
+                        |> Ok
 
                 0xA1 ->
-                    Ok
-                        { state
-                            | programCounter =
-                                state.programCounter
-                                    + (if not (Set.member (Registers.get x state.registers) state.keypad) then
-                                        4
+                    nextInstruction state
+                        |> (if not (Set.member xValue state.keypad) then
+                                nextInstruction
 
-                                       else
-                                        2
-                                      )
-                        }
+                            else
+                                identity
+                           )
+                        |> Ok
 
                 _ ->
                     Err (InvalidInstruction instruction)
@@ -592,64 +499,47 @@ runInstruction state instruction =
         0x0F ->
             case kk of
                 0x07 ->
-                    Ok
-                        { state
-                            | registers = Registers.set x state.delayTimer state.registers
-                            , programCounter = state.programCounter + 2
-                        }
+                    setRegister state.delayTimer x state
+                        |> nextInstruction
+                        |> Ok
 
                 0x0A ->
-                    Ok
-                        { state
-                            | status = WaitingForInput x
-                        }
+                    Ok { state | status = WaitingForInput x }
 
                 0x15 ->
-                    Ok
-                        { state
-                            | delayTimer = Registers.get x state.registers
-                            , programCounter = state.programCounter + 2
-                        }
+                    { state | delayTimer = Registers.get x state.registers }
+                        |> nextInstruction
+                        |> Ok
 
                 0x18 ->
-                    Ok
-                        { state
-                            | soundTimer = Registers.get x state.registers
-                            , programCounter = state.programCounter + 2
-                        }
+                    { state | soundTimer = Registers.get x state.registers }
+                        |> nextInstruction
+                        |> Ok
 
                 0x1E ->
-                    Ok
-                        { state
-                            | indexRegister =
-                                Registers.get x state.registers
-                                    + state.indexRegister
-                            , programCounter = state.programCounter + 2
-                        }
+                    modifyIndexRegister ((+) xValue) state
+                        |> nextInstruction
+                        |> Ok
 
                 0x29 ->
-                    Ok
-                        { state
-                            | indexRegister =
-                                Memory.fontAddress
-                                    + (Registers.get x state.registers * 5)
-                            , programCounter = state.programCounter + 2
-                        }
+                    setIndexRegister (Memory.fontAddress + (5 * xValue)) state
+                        |> nextInstruction
+                        |> Ok
 
                 0x33 ->
                     let
-                        value =
-                            Registers.get x state.registers
+                        write addr =
+                            Memory.write (Address (state.indexRegister + addr))
                     in
-                    Ok
-                        { state
-                            | memory =
-                                state.memory
-                                    |> Memory.write (Address state.indexRegister) (value // 100)
-                                    |> Memory.write (Address (state.indexRegister + 1)) (modBy 10 (value // 10))
-                                    |> Memory.write (Address (state.indexRegister + 2)) (modBy 100 (modBy 10 value))
-                            , programCounter = state.programCounter + 2
-                        }
+                    { state
+                        | memory =
+                            state.memory
+                                |> write 0 (xValue // 100)
+                                |> write 1 (modBy 10 (xValue // 10))
+                                |> write 2 (modBy 100 (modBy 10 xValue))
+                    }
+                        |> nextInstruction
+                        |> Ok
 
                 0x55 ->
                     let
@@ -657,35 +547,97 @@ runInstruction state instruction =
                             Registers.toList state.registers
                                 |> List.take (x + 1)
                     in
-                    Ok
-                        { state
-                            | memory =
-                                Memory.writeMany (Address state.indexRegister)
-                                    registers
-                                    state.memory
-                            , programCounter = state.programCounter + 2
-                        }
+                    { state
+                        | memory =
+                            Memory.writeMany (Address state.indexRegister)
+                                registers
+                                state.memory
+                    }
+                        |> nextInstruction
+                        |> Ok
 
                 0x65 ->
-                    Ok
-                        { state
-                            | registers =
-                                Memory.readMany (x + 1)
-                                    (Address state.indexRegister)
-                                    state.memory
-                                    |> List.Extra.indexedFoldl
-                                        (\index value registers ->
-                                            Registers.set index value registers
-                                        )
-                                        state.registers
-                            , programCounter = state.programCounter + 2
-                        }
+                    let
+                        memoryRegisters =
+                            Memory.readMany (x + 1)
+                                (Address state.indexRegister)
+                                state.memory
+                    in
+                    { state
+                        | registers =
+                            List.Extra.indexedFoldl Registers.set
+                                state.registers
+                                memoryRegisters
+                    }
+                        |> nextInstruction
+                        |> Ok
 
                 _ ->
                     Err (InvalidInstruction instruction)
 
         _ ->
             Err (InvalidInstruction instruction)
+
+
+clearDisplay : State -> State
+clearDisplay state =
+    { state | display = Set.empty }
+
+
+nextInstruction : State -> State
+nextInstruction state =
+    { state | programCounter = state.programCounter + 2 }
+
+
+popStack : State -> State
+popStack state =
+    let
+        ( newProgramCounter, newStack ) =
+            Stack.pop state.stack
+    in
+    { state
+        | stack = newStack
+        , programCounter = newProgramCounter
+    }
+
+
+jumpTo : Int -> State -> State
+jumpTo addr state =
+    { state | programCounter = addr }
+
+
+pushStack : State -> State
+pushStack state =
+    { state | stack = Stack.push state.programCounter state.stack }
+
+
+modifyRegister : (Int -> Int) -> Int -> State -> State
+modifyRegister f target state =
+    { state | registers = Registers.modify target f state.registers }
+
+
+setRegister : Int -> Int -> State -> State
+setRegister value =
+    modifyRegister (\_ -> value)
+
+
+modifyIndexRegister : (Int -> Int) -> State -> State
+modifyIndexRegister f state =
+    { state | indexRegister = f state.indexRegister }
+
+
+setIndexRegister : Int -> State -> State
+setIndexRegister value =
+    modifyIndexRegister (\_ -> value)
+
+
+stepSeed : State -> ( Int, State )
+stepSeed state =
+    let
+        ( randomByte, newSeed ) =
+            Random.step randomByteGenerator state.seed
+    in
+    ( randomByte, { state | seed = newSeed } )
 
 
 spriteFromRows : List Int -> List Pixel
