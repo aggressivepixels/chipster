@@ -425,6 +425,27 @@ runInstruction state instruction =
                             , programCounter = state.programCounter + 2
                         }
 
+                0x07 ->
+                    let
+                        result =
+                            Registers.get y state.registers
+                                - Registers.get x state.registers
+                    in
+                    Ok
+                        { state
+                            | registers =
+                                state.registers
+                                    |> Registers.set x (modBy 256 result)
+                                    |> Registers.set 0x0F
+                                        (if result > 0 then
+                                            1
+
+                                         else
+                                            0
+                                        )
+                            , programCounter = state.programCounter + 2
+                        }
+
                 0x0E ->
                     Ok
                         { state
