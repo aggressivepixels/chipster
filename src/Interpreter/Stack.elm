@@ -1,4 +1,4 @@
-module Stack exposing (Stack, init, pop, push)
+module Interpreter.Stack exposing (Stack, init, pop, push)
 
 
 type Stack

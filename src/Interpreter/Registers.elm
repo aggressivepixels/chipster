@@ -1,4 +1,4 @@
-module Registers exposing
+module Interpreter.Registers exposing
     ( Registers
     , get
     , init

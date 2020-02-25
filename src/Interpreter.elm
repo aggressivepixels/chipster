@@ -11,13 +11,13 @@ module Interpreter exposing
 import Bitwise
 import Browser.Events as Events
 import Html exposing (Html)
+import Interpreter.Memory as Memory exposing (Address(..), Memory)
+import Interpreter.Registers as Registers exposing (Registers)
+import Interpreter.Stack as Stack exposing (Stack)
 import Json.Decode as Decode exposing (Decoder)
 import List.Extra
-import Memory exposing (Address(..), Memory)
 import Random exposing (Generator, Seed)
-import Registers exposing (Registers)
 import Set exposing (Set)
-import Stack exposing (Stack)
 import Svg exposing (Svg)
 import Svg.Attributes as Attributes
 import Svg.Keyed as Keyed

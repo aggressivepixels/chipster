@@ -1,4 +1,4 @@
-module Memory exposing
+module Interpreter.Memory exposing
     ( Address(..)
     , Memory
     , fontAddress
