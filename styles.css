@@ -19,6 +19,25 @@ main {
   width: fit-content;
 }
 
+a:any-link {
+  color: gray;
+  text-decoration: underline;
+}
+
+a:hover {
+  color: whitesmoke;
+}
+
 .interpreter {
   border: 1px gray solid;
+}
+
+.games {
+  width: 640px;
+}
+
+.games a {
+  float: left;
+  margin-inline-end: 1em;
+  margin-block-end: 1em;
 }

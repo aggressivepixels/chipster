@@ -148,7 +148,11 @@ view model =
         Valid games Dashboard ->
             { title = appName
             , body =
-                skeleton appName (List.map viewGame games)
+                skeleton appName
+                    [ Html.p
+                        [ Attributes.class "games" ]
+                        (List.map viewGame games)
+                    ]
             }
 
         Valid _ (InvalidProgram name) ->
