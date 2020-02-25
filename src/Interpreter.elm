@@ -39,6 +39,7 @@ type alias State =
     , status : Status
     , keypad : Set Int
     , delayTimer : Int
+    , soundTimer : Int
     }
 
 
@@ -81,6 +82,7 @@ init program seed =
                     , status = Running
                     , keypad = Set.empty
                     , delayTimer = 0
+                    , soundTimer = 0
                     }
             )
 
@@ -193,7 +195,10 @@ runCycles count state =
 
 updateTimers : State -> State
 updateTimers state =
-    { state | delayTimer = max 0 (state.delayTimer - 1) }
+    { state
+        | delayTimer = max 0 (state.delayTimer - 1)
+        , soundTimer = max 0 (state.soundTimer - 1)
+    }
 
 
 fetchInstruction : State -> Int
@@ -457,7 +462,7 @@ runInstruction state instruction =
                             Set.diff union intersection
                     , registers =
                         Registers.set 0x0F
-                            (if Set.isEmpty union then
+                            (if Set.isEmpty intersection then
                                 0
 
                              else
@@ -475,6 +480,19 @@ runInstruction state instruction =
                             | programCounter =
                                 state.programCounter
                                     + (if Set.member (Registers.get x state.registers) state.keypad then
+                                        4
+
+                                       else
+                                        2
+                                      )
+                        }
+
+                0xA1 ->
+                    Ok
+                        { state
+                            | programCounter =
+                                state.programCounter
+                                    + (if not (Set.member (Registers.get x state.registers) state.keypad) then
                                         4
 
                                        else
@@ -504,6 +522,13 @@ runInstruction state instruction =
                     Ok
                         { state
                             | delayTimer = Registers.get x state.registers
+                            , programCounter = state.programCounter + 2
+                        }
+
+                0x18 ->
+                    Ok
+                        { state
+                            | soundTimer = Registers.get x state.registers
                             , programCounter = state.programCounter + 2
                         }
 
