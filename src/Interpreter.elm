@@ -1,4 +1,4 @@
-module Interpreter exposing
+port module Interpreter exposing
     ( Error(..)
     , Interpreter
     , Msg
@@ -22,6 +22,9 @@ import Svg exposing (Svg)
 import Svg.Attributes as Attributes
 import Svg.Keyed as Keyed
 import Svg.Lazy exposing (lazy)
+
+
+port beep : () -> Cmd msg
 
 
 type Interpreter
@@ -143,39 +146,51 @@ viewPixel ( x, y ) =
 -- UPDATE
 
 
-update : Msg -> Interpreter -> Result Error Interpreter
+update : Msg -> Interpreter -> Result Error ( Interpreter, Cmd Msg )
 update msg (Interpreter state) =
     case ( msg, state.status ) of
         ( FramePassed _, _ ) ->
             runCycles 10 state
                 |> Result.map updateTimers
-                |> Result.map Interpreter
+                |> Result.map
+                    (\newState ->
+                        ( Interpreter newState
+                        , if state.soundTimer == 1 then
+                            beep ()
+
+                          else
+                            Cmd.none
+                        )
+                    )
 
         ( KeyPressed key, Running ) ->
             Ok
-                (Interpreter
+                ( Interpreter
                     { state
                         | keypad = Set.insert key state.keypad
                     }
+                , Cmd.none
                 )
 
         ( KeyPressed key, WaitingForInput x ) ->
             Ok
-                (Interpreter
+                ( Interpreter
                     { state
                         | keypad = Set.insert key state.keypad
                         , registers = Registers.set x key state.registers
                         , programCounter = state.programCounter + 2
                         , status = Running
                     }
+                , Cmd.none
                 )
 
         ( KeyReleased key, _ ) ->
             Ok
-                (Interpreter
+                ( Interpreter
                     { state
                         | keypad = Set.remove key state.keypad
                     }
+                , Cmd.none
                 )
 
 

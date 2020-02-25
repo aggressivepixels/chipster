@@ -126,8 +126,10 @@ update msg model =
 
         ( Valid games (Playing name oldInterpreter Running), InterpreterMsg interpreterMsg ) ->
             case Interpreter.update interpreterMsg oldInterpreter of
-                Ok newInterpreter ->
-                    ( Valid games (Playing name newInterpreter Running), Cmd.none )
+                Ok ( newInterpreter, interpreterCmd ) ->
+                    ( Valid games (Playing name newInterpreter Running)
+                    , Cmd.map InterpreterMsg interpreterCmd
+                    )
 
                 Err error ->
                     ( Valid games (Playing name oldInterpreter (Crashed error)), Cmd.none )
