@@ -10,6 +10,7 @@ port module Interpreter exposing
 
 import Bitwise
 import Browser.Events as Events
+import Hex
 import Html exposing (Html)
 import Interpreter.Memory as Memory exposing (Address(..), Memory)
 import Interpreter.Stack as Stack exposing (Stack)
@@ -165,10 +166,7 @@ update msg (Interpreter state) =
 
         ( KeyPressed key, Running ) ->
             Ok
-                ( Interpreter
-                    { state
-                        | keypad = Set.insert key state.keypad
-                    }
+                ( Interpreter { state | keypad = Set.insert key state.keypad }
                 , Cmd.none
                 )
 
@@ -201,7 +199,12 @@ runCycles count state =
     else
         case runInstruction (nextInstruction state) (fetchInstruction state) of
             Ok newState ->
-                runCycles (count - 1) newState
+                case newState.status of
+                    WaitingForInput _ ->
+                        Ok newState
+
+                    _ ->
+                        runCycles (count - 1) newState
 
             Err err ->
                 Err err
@@ -257,6 +260,9 @@ runInstruction state instruction =
 
         vy =
             V.get y state.v
+
+        _ =
+            Debug.log "INSTRUCTION" (Hex.toHexString instruction)
     in
     case ( op, y, n ) of
         -- 00E0 - CLS
