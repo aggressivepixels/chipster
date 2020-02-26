@@ -1,6 +1,6 @@
 # Chipster
 
-**Chipster** a [CHIP-8] interpreter built on [Elm]. Play with it
+**Chipster** is a [CHIP-8] interpreter built on [Elm]. Play with it
 [here](https://aggressivepixels.github.io/chipster/).
 
 ### Games included
