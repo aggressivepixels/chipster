@@ -37,6 +37,7 @@
 
 ### TODOs
 
+- [ ] Improve the project's structure.
 - [ ] Fix the few games that don't work.
 - [ ] Improve the UI of the web page.
 - [ ] Add some buttons for restarting and loading new programs right in the
