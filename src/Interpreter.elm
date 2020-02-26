@@ -10,7 +10,6 @@ port module Interpreter exposing
 
 import Bitwise
 import Browser.Events as Events
-import Hex
 import Html exposing (Html)
 import Interpreter.Memory as Memory exposing (Address(..), Memory)
 import Interpreter.Stack as Stack exposing (Stack)
@@ -260,9 +259,6 @@ runInstruction state instruction =
 
         vy =
             V.get y state.v
-
-        _ =
-            Debug.log "INSTRUCTION" (Hex.toHexString instruction)
     in
     case ( op, y, n ) of
         -- 00E0 - CLS
