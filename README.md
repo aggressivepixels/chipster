@@ -7,14 +7,12 @@
 
 - **15PUZZLE**: Seems to work.
 - **BLINKY**: The ghosts seem to go out of screen and ignore the walls.
-- **BLITZ**: Displays garbage.
+- **BLITZ**: Works.
 - **BREAKOUT**: Seems to work.
 - **BRIX**: Seems to work.
-- **CONNECT4**: It's slightly broken now, even though it used to work. _Sigh._
-- **GUESS**: The screen goes black after showing the numbers after the first
-  guess. Shouldn't happen. It used to work.
-- **HIDDEN**: Displays some garbage and then works. Actually, I have no idea
-  how to play it, so perhaps it doesn't work at all!
+- **CONNECT4**: Works.
+- **GUESS**: Works.
+- **HIDDEN**: Seems to work.
 - **INVADERS**: Seems to work.
 - **KALEID**: Works.
 - **MAZE**: Works.
@@ -28,9 +26,9 @@
   it seems intentional.
 - **TANK**: Seems to work.
 - **TETRIS**: Seems to work.
-- **TICTAC**: Used to work. It's currently broken.
+- **TICTAC**: Works.
 - **UFO**: Seems to work.
-- **VBRIX**: Half broken.
+- **VBRIX**: Broken? I have no idea.
 - **VERS**: Seems to work.
 - **WALL**: Seems to work.
 - **WIPEOFF**: Works.
