@@ -3,7 +3,7 @@
 **Chipster** a [CHIP-8] interpreter built on [Elm]. Play with it
 [here](https://aggressivepixels.github.io/chipster/).
 
-# Games included
+### Games included
 
 - **15PUZZLE**: Seems to work.
 - **BLINKY**: The ghosts seem to go out of screen and ignore the walls.
@@ -34,6 +34,14 @@
 - **VERS**: Seems to work.
 - **WALL**: Seems to work.
 - **WIPEOFF**: Works.
+
+### TODOs
+
+- [ ] Fix the few games that don't work.
+- [ ] Improve the UI of the web page.
+- [ ] Add some buttons for restarting and loading new programs right in the
+      interpreter page.
+- [ ] Resize the interpreter automatically.
 
 [chip-8]: https://en.wikipedia.org/wiki/CHIP-8
 [elm]: https://elm-lang.org
