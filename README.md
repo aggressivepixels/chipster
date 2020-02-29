@@ -6,7 +6,7 @@
 ### Games included
 
 - **15PUZZLE**: Seems to work.
-- **BLINKY**: The ghosts seem to go out of screen and ignore the walls.
+- **BLINKY**: Seems to work.
 - **BLITZ**: Works.
 - **BREAKOUT**: Seems to work.
 - **BRIX**: Seems to work.
