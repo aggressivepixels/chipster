@@ -369,8 +369,8 @@ runInstruction state instruction =
 
         -- 8xy6 - SHR Vx
         ( 0x08, _, 0x06 ) ->
-            setV (Bitwise.shiftRightZfBy 1 vy) x state
-                |> setV (Bitwise.and 1 vy) 0x0F
+            modifyV (Bitwise.shiftRightZfBy 1) x state
+                |> setV (Bitwise.and 1 vx) 0x0F
                 |> Ok
 
         -- 8xy7 - SUBN Vx, Vy
@@ -392,8 +392,8 @@ runInstruction state instruction =
 
         -- 8xyE - SHL Vx
         ( 0x08, _, 0x0E ) ->
-            setV (modBy 256 (Bitwise.shiftLeftBy 1 vy)) x state
-                |> setV (Bitwise.shiftRightZfBy 7 vy) 0x0F
+            modifyV (Bitwise.shiftLeftBy 1 >> modBy 256) x state
+                |> setV (Bitwise.shiftRightZfBy 7 vx) 0x0F
                 |> Ok
 
         -- 9xy0 - SNE Vx, Vy
