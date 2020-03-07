@@ -281,33 +281,15 @@ runInstruction state instruction =
 
         -- 3xkk - SE Vx, kk
         ( 0x03, _, _ ) ->
-            Ok
-                (if vx == kk then
-                    nextInstruction state
-
-                 else
-                    state
-                )
+            Ok (nextInstructionIf (vx == kk) state)
 
         -- 4xkk - SNE Vx, kk
         ( 0x04, _, _ ) ->
-            Ok
-                (if vx /= kk then
-                    nextInstruction state
-
-                 else
-                    state
-                )
+            Ok (nextInstructionIf (vx /= kk) state)
 
         -- 5xy0 - SE Vx, Vy
         ( 0x05, _, _ ) ->
-            Ok
-                (if vx == vy then
-                    nextInstruction state
-
-                 else
-                    state
-                )
+            Ok (nextInstructionIf (vx == vy) state)
 
         -- 6xkk - LD Vx, kk
         ( 0x06, _, _ ) ->
@@ -398,13 +380,7 @@ runInstruction state instruction =
 
         -- 9xy0 - SNE Vx, Vy
         ( 0x09, _, _ ) ->
-            Ok
-                (if vx /= vy then
-                    nextInstruction state
-
-                 else
-                    state
-                )
+            Ok (nextInstructionIf (vx /= vy) state)
 
         -- Annn - LD I, nnn
         ( 0x0A, _, _ ) ->
@@ -460,23 +436,11 @@ runInstruction state instruction =
 
         -- Ex9E - SKP Vx
         ( 0x0E, 0x09, 0x0E ) ->
-            Ok
-                (if Set.member vx state.keypad then
-                    nextInstruction state
-
-                 else
-                    state
-                )
+            Ok (nextInstructionIf (Set.member vx state.keypad) state)
 
         -- ExA1 - SKNP Vx
         ( 0x0E, 0x0A, 0x01 ) ->
-            Ok
-                (if not (Set.member vx state.keypad) then
-                    nextInstruction state
-
-                 else
-                    state
-                )
+            Ok (nextInstructionIf (not (Set.member vx state.keypad)) state)
 
         -- Fx07 - LD Vx, DT
         ( 0x0F, 0x00, 0x07 ) ->
@@ -545,6 +509,15 @@ runInstruction state instruction =
 
         _ ->
             Err (InvalidInstruction instruction)
+
+
+nextInstructionIf : Bool -> State -> State
+nextInstructionIf cond state =
+    if cond then
+        nextInstruction state
+
+    else
+        state
 
 
 clearDisplay : State -> State
