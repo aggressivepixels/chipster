@@ -606,9 +606,9 @@ getBits =
 
 
 getBitsHelp : List Bool -> Int -> Int -> List Bool
-getBitsHelp spritePixels count int =
+getBitsHelp soFar count int =
     if count <= 0 then
-        List.reverse spritePixels
+        List.reverse soFar
 
     else
         let
@@ -618,7 +618,7 @@ getBitsHelp spritePixels count int =
             isOn =
                 Bitwise.and mask int /= 0
         in
-        getBitsHelp (isOn :: spritePixels) (count - 1) int
+        getBitsHelp (isOn :: soFar) (count - 1) int
 
 
 randomByteGenerator : Generator Int
