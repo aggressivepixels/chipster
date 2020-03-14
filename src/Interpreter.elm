@@ -182,10 +182,7 @@ update msg (Interpreter state) =
 
         ( KeyReleased key, _ ) ->
             Ok
-                ( Interpreter
-                    { state
-                        | keypad = Set.remove key state.keypad
-                    }
+                ( Interpreter { state | keypad = Set.remove key state.keypad }
                 , Cmd.none
                 )
 
@@ -322,14 +319,7 @@ runInstruction state instruction =
                     vx + vy
             in
             setV (modBy 256 result) x state
-                |> setV
-                    (if result > 255 then
-                        1
-
-                     else
-                        0
-                    )
-                    0x0F
+                |> updateVf (result > 255)
                 |> Ok
 
         -- 8xy5 - SUB Vx, Vy
@@ -339,14 +329,7 @@ runInstruction state instruction =
                     vx - vy
             in
             setV (modBy 256 result) x state
-                |> setV
-                    (if result > 0 then
-                        1
-
-                     else
-                        0
-                    )
-                    0x0F
+                |> updateVf (result > 0)
                 |> Ok
 
         -- 8xy6 - SHR Vx
@@ -362,14 +345,7 @@ runInstruction state instruction =
                     vy - vx
             in
             setV (modBy 256 result) x state
-                |> setV
-                    (if result > 0 then
-                        1
-
-                     else
-                        0
-                    )
-                    0x0F
+                |> updateVf (result > 0)
                 |> Ok
 
         -- 8xyE - SHL Vx
@@ -414,25 +390,17 @@ runInstruction state instruction =
 
                 intersection =
                     Set.intersect sprite state.display
+
+                ( newDisplay, noPixelsErased ) =
+                    if Set.isEmpty intersection then
+                        ( union, True )
+
+                    else
+                        ( Set.diff union intersection, False )
             in
-            Ok
-                { state
-                    | display =
-                        if Set.isEmpty intersection then
-                            union
-
-                        else
-                            Set.diff union intersection
-                    , v =
-                        V.set 0x0F
-                            (if Set.isEmpty intersection then
-                                0
-
-                             else
-                                1
-                            )
-                            state.v
-                }
+            { state | display = newDisplay }
+                |> updateVf (not noPixelsErased)
+                |> Ok
 
         -- Ex9E - SKP Vx
         ( 0x0E, 0x09, 0x0E ) ->
@@ -491,9 +459,7 @@ runInstruction state instruction =
             Ok
                 { state
                     | memory =
-                        Memory.writeMany (Address state.i)
-                            v
-                            state.memory
+                        Memory.writeMany (Address state.i) v state.memory
                 }
 
         -- Fx65 - LD Vx, [I]
@@ -560,6 +526,18 @@ modifyV f target state =
 setV : Int -> Int -> State -> State
 setV value =
     modifyV (\_ -> value)
+
+
+updateVf : Bool -> State -> State
+updateVf cond =
+    setV
+        (if cond then
+            1
+
+         else
+            0
+        )
+        0x0F
 
 
 modifyI : (Int -> Int) -> State -> State
