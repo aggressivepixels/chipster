@@ -12,7 +12,6 @@ import Html.Events as Events
 import Interpreter exposing (Error(..), Interpreter)
 import Json.Decode as Decode exposing (Decoder, Value, decodeValue)
 import Task
-import Time
 
 
 fileBytes : Int -> Bytes.Decode.Decoder (List Int)
@@ -96,7 +95,7 @@ type Msg
     | LoadGameClicked
     | GameLoaded File
     | GameDecoded (Maybe Game)
-    | SeedGenerated Int Game
+    | GotInterpreter String (Result Interpreter.InvalidProgram Interpreter)
     | InterpreterMsg Interpreter.Msg
 
 
@@ -105,24 +104,20 @@ update msg model =
     case ( model, msg ) of
         ( Valid _ Dashboard, GameClicked game ) ->
             ( model
-            , Task.perform
-                (\time ->
-                    SeedGenerated (Time.posixToMillis time) game
-                )
-                Time.now
+            , Task.attempt
+                (GotInterpreter game.name)
+                (Interpreter.make game.data)
             )
 
-        ( Valid games Dashboard, SeedGenerated seed game ) ->
-            case Interpreter.init game.data seed of
-                Just interpreter ->
-                    ( Valid games (Playing game.name interpreter Running)
-                    , Cmd.none
-                    )
+        ( Valid games Dashboard, GotInterpreter name (Ok interpreter) ) ->
+            ( Valid games (Playing name interpreter Running)
+            , Cmd.none
+            )
 
-                Nothing ->
-                    ( Valid games (InvalidProgram game.name)
-                    , Cmd.none
-                    )
+        ( Valid games Dashboard, GotInterpreter name (Err _) ) ->
+            ( Valid games (InvalidProgram name)
+            , Cmd.none
+            )
 
         ( Valid games (Playing name oldInterpreter Running), InterpreterMsg interpreterMsg ) ->
             case Interpreter.update interpreterMsg oldInterpreter of
@@ -132,7 +127,9 @@ update msg model =
                     )
 
                 Err error ->
-                    ( Valid games (Playing name oldInterpreter (Crashed error)), Cmd.none )
+                    ( Valid games (Playing name oldInterpreter (Crashed error))
+                    , Cmd.none
+                    )
 
         ( Valid games _, BackClicked ) ->
             ( Valid games Dashboard, Cmd.none )

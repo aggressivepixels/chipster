@@ -1,8 +1,9 @@
 port module Interpreter exposing
     ( Error(..)
     , Interpreter
+    , InvalidProgram
     , Msg
-    , init
+    , make
     , subscriptions
     , update
     , view
@@ -22,6 +23,8 @@ import Svg exposing (Svg)
 import Svg.Attributes as Attributes
 import Svg.Keyed as Keyed
 import Svg.Lazy exposing (lazy)
+import Task exposing (Task)
+import Time
 
 
 port beep : () -> Cmd msg
@@ -63,6 +66,24 @@ type Msg
     = FramePassed Float
     | KeyPressed Int
     | KeyReleased Int
+
+
+type InvalidProgram
+    = InvalidProgram
+
+
+make : List Int -> Task InvalidProgram Interpreter
+make program =
+    Time.now
+        |> Task.andThen
+            (\seed ->
+                case init program (Time.posixToMillis seed) of
+                    Just interpreter ->
+                        Task.succeed interpreter
+
+                    Nothing ->
+                        Task.fail InvalidProgram
+            )
 
 
 
