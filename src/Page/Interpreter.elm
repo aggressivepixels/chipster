@@ -1,4 +1,4 @@
-port module Interpreter exposing
+port module Page.Interpreter exposing
     ( Error(..)
     , Interpreter
     , InvalidProgram
@@ -12,11 +12,11 @@ port module Interpreter exposing
 import Bitwise
 import Browser.Events as BE
 import Html as H
-import Interpreter.Memory as Memory exposing (Address(..), Memory)
-import Interpreter.Stack as Stack exposing (Stack)
-import Interpreter.V as V exposing (V)
 import Json.Decode as JD
 import List.Extra
+import Page.Interpreter.Memory as Memory exposing (Address(..), Memory)
+import Page.Interpreter.Stack as Stack exposing (Stack)
+import Page.Interpreter.V as V exposing (V)
 import Random exposing (Generator, Seed)
 import Set exposing (Set)
 import Svg as S

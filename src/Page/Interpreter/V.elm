@@ -1,4 +1,4 @@
-module Interpreter.V exposing
+module Page.Interpreter.V exposing
     ( V
     , get
     , init

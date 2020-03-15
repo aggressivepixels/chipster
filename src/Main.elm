@@ -9,8 +9,8 @@ import Hex exposing (toHexString)
 import Html as H
 import Html.Attributes as HA
 import Html.Events as HE
-import Interpreter exposing (Error(..), Interpreter)
 import Json.Decode as JD
+import Page.Interpreter as Interpreter exposing (Error(..), Interpreter)
 import Task
 
 
