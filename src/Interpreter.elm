@@ -10,19 +10,19 @@ port module Interpreter exposing
     )
 
 import Bitwise
-import Browser.Events as Events
-import Html exposing (Html)
+import Browser.Events as BE
+import Html as H
 import Interpreter.Memory as Memory exposing (Address(..), Memory)
 import Interpreter.Stack as Stack exposing (Stack)
 import Interpreter.V as V exposing (V)
-import Json.Decode as Decode exposing (Decoder)
+import Json.Decode as JD
 import List.Extra
 import Random exposing (Generator, Seed)
 import Set exposing (Set)
-import Svg exposing (Svg)
-import Svg.Attributes as Attributes
-import Svg.Keyed as Keyed
-import Svg.Lazy exposing (lazy)
+import Svg as S
+import Svg.Attributes as SA
+import Svg.Keyed as SK
+import Svg.Lazy as SL
 import Task exposing (Task)
 import Time
 
@@ -115,50 +115,46 @@ init program seed =
 -- VIEW
 
 
-view : Interpreter -> Html msg
+view : Interpreter -> H.Html msg
 view (Interpreter state) =
-    Svg.svg
-        [ Attributes.width "640"
-        , Attributes.height "320"
-        , Attributes.viewBox "0 0 64 32"
-        ]
+    S.svg [ SA.width "640", SA.height "320", SA.viewBox "0 0 64 32" ]
         [ viewBackground
-        , lazy viewDisplay state.display
+        , SL.lazy viewDisplay state.display
         ]
 
 
-viewBackground : Svg msg
+viewBackground : S.Svg msg
 viewBackground =
-    Svg.rect
-        [ Attributes.x "0"
-        , Attributes.y "0"
-        , Attributes.width "64"
-        , Attributes.height "32"
-        , Attributes.fill "black"
+    S.rect
+        [ SA.x "0"
+        , SA.y "0"
+        , SA.width "64"
+        , SA.height "32"
+        , SA.fill "black"
         ]
         []
 
 
-viewDisplay : Set Pixel -> Svg msg
+viewDisplay : Set Pixel -> S.Svg msg
 viewDisplay =
-    Set.toList >> List.map viewKeyedPixel >> Keyed.node "g" []
+    Set.toList >> List.map viewKeyedPixel >> SK.node "g" []
 
 
-viewKeyedPixel : Pixel -> ( String, Svg msg )
+viewKeyedPixel : Pixel -> ( String, S.Svg msg )
 viewKeyedPixel ( x, y ) =
     ( String.fromInt x ++ "," ++ String.fromInt y
-    , lazy viewPixel ( x, y )
+    , SL.lazy viewPixel ( x, y )
     )
 
 
-viewPixel : Pixel -> Svg msg
+viewPixel : Pixel -> S.Svg msg
 viewPixel ( x, y ) =
-    Svg.rect
-        [ Attributes.x (String.fromInt x)
-        , Attributes.y (String.fromInt y)
-        , Attributes.width "1"
-        , Attributes.height "1"
-        , Attributes.fill "white"
+    S.rect
+        [ SA.x (String.fromInt x)
+        , SA.y (String.fromInt y)
+        , SA.width "1"
+        , SA.height "1"
+        , SA.fill "white"
         ]
         []
 
@@ -634,7 +630,7 @@ subscriptions (Interpreter state) =
     case state.status of
         Running ->
             Sub.batch
-                [ Events.onAnimationFrameDelta FramePassed
+                [ BE.onAnimationFrameDelta FramePassed
                 , keyboardSubscriptions
                 ]
 
@@ -645,22 +641,22 @@ subscriptions (Interpreter state) =
 keyboardSubscriptions : Sub Msg
 keyboardSubscriptions =
     Sub.batch
-        [ Events.onKeyDown (keyDecoder KeyPressed)
-        , Events.onKeyUp (keyDecoder KeyReleased)
+        [ BE.onKeyDown (keyDecoder KeyPressed)
+        , BE.onKeyUp (keyDecoder KeyReleased)
         ]
 
 
-keyDecoder : (Int -> msg) -> Decoder msg
+keyDecoder : (Int -> msg) -> JD.Decoder msg
 keyDecoder toMsg =
-    Decode.field "key" Decode.string
-        |> Decode.andThen (keyToMsg toMsg)
+    JD.field "key" JD.string
+        |> JD.andThen (keyToMsg toMsg)
 
 
-keyToMsg : (Int -> msg) -> String -> Decoder msg
+keyToMsg : (Int -> msg) -> String -> JD.Decoder msg
 keyToMsg toMsg string =
     let
         succeed =
-            Decode.succeed << toMsg
+            JD.succeed << toMsg
     in
     case String.toLower string of
         "1" ->
@@ -712,4 +708,4 @@ keyToMsg toMsg string =
             succeed 0x0F
 
         _ ->
-            Decode.fail ("Not interested in " ++ string)
+            JD.fail ("Not interested in " ++ string)

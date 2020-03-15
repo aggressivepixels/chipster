@@ -1,43 +1,33 @@
 module Main exposing (main)
 
-import Browser
-import Bytes exposing (Endianness(..))
-import Bytes.Decode exposing (Step(..))
+import Browser exposing (Document)
+import Bytes
+import Bytes.Decode as BD
 import File exposing (File)
 import File.Select as Select
 import Hex exposing (toHexString)
-import Html exposing (Html)
-import Html.Attributes as Attributes
-import Html.Events as Events
+import Html as H
+import Html.Attributes as HA
+import Html.Events as HE
 import Interpreter exposing (Error(..), Interpreter)
-import Json.Decode as Decode exposing (Decoder, Value, decodeValue)
+import Json.Decode as JD
 import Task
 
 
-fileBytes : Int -> Bytes.Decode.Decoder (List Int)
+fileBytes : Int -> BD.Decoder (List Int)
 fileBytes length =
-    Bytes.Decode.loop ( length, [] ) fileBytesStep
+    BD.loop ( length, [] ) fileBytesStep
 
 
 fileBytesStep :
     ( Int, List Int )
-    -> Bytes.Decode.Decoder (Step ( Int, List Int ) (List Int))
+    -> BD.Decoder (BD.Step ( Int, List Int ) (List Int))
 fileBytesStep ( n, xs ) =
     if n <= 0 then
-        Bytes.Decode.succeed (Done (List.reverse xs))
+        BD.succeed (BD.Done (List.reverse xs))
 
     else
-        Bytes.Decode.map (\x -> Loop ( n - 1, x :: xs ))
-            Bytes.Decode.unsignedInt8
-
-
-type Flags
-    = Flags Game (List Game)
-
-
-flagsDecoder : Decoder Flags
-flagsDecoder =
-    Decode.oneOrMore Flags gameDecoder
+        BD.map (\x -> BD.Loop ( n - 1, x :: xs )) BD.unsignedInt8
 
 
 type alias Game =
@@ -46,14 +36,14 @@ type alias Game =
     }
 
 
-gameDecoder : Decoder Game
+gameDecoder : JD.Decoder Game
 gameDecoder =
-    Decode.map2 Game
-        (Decode.field "name" Decode.string)
-        (Decode.field "data" (Decode.list Decode.int))
+    JD.map2 Game
+        (JD.field "name" JD.string)
+        (JD.field "data" (JD.list JD.int))
 
 
-main : Program Value Model Msg
+main : Program JD.Value Model Msg
 main =
     Browser.document
         { init = init
@@ -79,11 +69,11 @@ type Status
     | Crashed Error
 
 
-init : Value -> ( Model, Cmd Msg )
+init : JD.Value -> ( Model, Cmd Msg )
 init value =
-    case decodeValue flagsDecoder value of
-        Ok (Flags x xs) ->
-            ( Valid (x :: xs) Dashboard, Cmd.none )
+    case JD.decodeValue (JD.list gameDecoder) value of
+        Ok games ->
+            ( Valid games Dashboard, Cmd.none )
 
         Err _ ->
             ( Invalid, Cmd.none )
@@ -142,7 +132,7 @@ update msg model =
             , File.toBytes game
                 |> Task.map
                     (\bytes ->
-                        Bytes.Decode.decode (fileBytes (Bytes.width bytes)) bytes
+                        BD.decode (fileBytes (Bytes.width bytes)) bytes
                             |> Maybe.map (\data -> Game (File.name game) data)
                     )
                 |> Task.perform GameDecoded
@@ -165,39 +155,38 @@ subscriptions model =
             Sub.none
 
 
-view : Model -> Browser.Document Msg
+view : Model -> Document Msg
 view model =
     let
         appName =
             "Chipster"
 
         skeleton title content =
-            [ Html.main_ []
-                [ Html.h2 [] [ Html.text title ]
-                , Html.div [] content
+            [ H.main_ []
+                [ H.h2 [] [ H.text title ]
+                , H.div [] content
                 ]
             ]
     in
     case model of
         Invalid ->
             { title = appName
-            , body =
-                skeleton "An error has ocurred" []
+            , body = skeleton "An error has ocurred" []
             }
 
         Valid games Dashboard ->
             { title = appName
             , body =
                 skeleton appName
-                    [ Html.p [] [ Html.text "Choose a game" ]
-                    , Html.div
-                        [ Attributes.class "games" ]
+                    [ H.p [] [ H.text "Choose a game" ]
+                    , H.div
+                        [ HA.class "games" ]
                         (List.map viewGame games)
-                    , Html.p []
-                        [ Html.text "Or "
-                        , Html.a
-                            [ Attributes.href "#", Events.onClick LoadGameClicked ]
-                            [ Html.text "load your own" ]
+                    , H.p []
+                        [ H.text "Or "
+                        , H.a
+                            [ HA.href "#", HE.onClick LoadGameClicked ]
+                            [ H.text "load your own" ]
                         ]
                     ]
             }
@@ -207,7 +196,7 @@ view model =
             , body =
                 skeleton "Invalid program"
                     [ viewBack
-                    , Html.text "That program seems to be invalid, try another one perhaps?"
+                    , H.text "That program seems to be invalid, try another one perhaps?"
                     ]
             }
 
@@ -216,16 +205,15 @@ view model =
             , body =
                 skeleton name
                     [ viewBack
-                    , Html.div [ Attributes.class "interpreter" ]
-                        [ Interpreter.view interpreter
-                        ]
+                    , H.div [ HA.class "interpreter" ]
+                        [ Interpreter.view interpreter ]
                     , case status of
                         Running ->
-                            Html.text ""
+                            H.text ""
 
                         Crashed (InvalidInstruction instruction) ->
-                            Html.p []
-                                [ Html.text
+                            H.p []
+                                [ H.text
                                     ("Invalid instruction: "
                                         ++ toHexString instruction
                                     )
@@ -234,18 +222,14 @@ view model =
             }
 
 
-viewBack : Html Msg
+viewBack : H.Html Msg
 viewBack =
-    Html.p []
-        [ Html.a [ Attributes.href "#", Events.onClick BackClicked ]
-            [ Html.text "Go back" ]
+    H.p []
+        [ H.a [ HA.href "#", HE.onClick BackClicked ]
+            [ H.text "Go back" ]
         ]
 
 
-viewGame : Game -> Html Msg
+viewGame : Game -> H.Html Msg
 viewGame game =
-    Html.a
-        [ Attributes.href "#"
-        , Events.onClick (GameClicked game)
-        ]
-        [ Html.text game.name ]
+    H.a [ HA.href "#", HE.onClick (GameClicked game) ] [ H.text game.name ]
