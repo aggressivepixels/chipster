@@ -1,6 +1,7 @@
 module Main exposing (main)
 
-import Browser exposing (Document)
+import Browser exposing (Document, UrlRequest(..))
+import Browser.Navigation as Navigation exposing (Key)
 import Bytes
 import Bytes.Decode as BD
 import File exposing (File)
@@ -12,6 +13,7 @@ import Html.Events as HE
 import Json.Decode as JD
 import Page.Interpreter as Interpreter exposing (Error(..), Interpreter)
 import Task
+import Url exposing (Url)
 
 
 fileBytes : Int -> BD.Decoder (List Int)
@@ -45,17 +47,19 @@ gameDecoder =
 
 main : Program JD.Value Model Msg
 main =
-    Browser.document
+    Browser.application
         { init = init
         , view = view
         , update = update
         , subscriptions = subscriptions
+        , onUrlChange = UrlChanged
+        , onUrlRequest = UrlRequested
         }
 
 
 type Model
     = Invalid
-    | Valid (List Game) Page
+    | Valid (List Game) Page Key
 
 
 type Page
@@ -69,11 +73,11 @@ type Status
     | Crashed Error
 
 
-init : JD.Value -> ( Model, Cmd Msg )
-init value =
+init : JD.Value -> Url -> Key -> ( Model, Cmd Msg )
+init value _ key =
     case JD.decodeValue (JD.list gameDecoder) value of
         Ok games ->
-            ( Valid games Dashboard, Cmd.none )
+            ( Valid games Dashboard key, Navigation.pushUrl key "/" )
 
         Err _ ->
             ( Invalid, Cmd.none )
@@ -81,53 +85,51 @@ init value =
 
 type Msg
     = GameClicked Game
-    | BackClicked
     | LoadGameClicked
     | GameLoaded File
     | GameDecoded (Maybe Game)
     | GotInterpreter String (Result Interpreter.InvalidProgram Interpreter)
     | InterpreterMsg Interpreter.Msg
+    | UrlChanged Url
+    | UrlRequested UrlRequest
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( model, msg ) of
-        ( Valid _ Dashboard, GameClicked game ) ->
+        ( Valid _ Dashboard _, GameClicked game ) ->
             ( model
             , Task.attempt
                 (GotInterpreter game.name)
                 (Interpreter.make game.data)
             )
 
-        ( Valid games Dashboard, GotInterpreter name (Ok interpreter) ) ->
-            ( Valid games (Playing name interpreter Running)
-            , Cmd.none
+        ( Valid games Dashboard key, GotInterpreter name (Ok interpreter) ) ->
+            ( Valid games (Playing name interpreter Running) key
+            , Navigation.pushUrl key "/play"
             )
 
-        ( Valid games Dashboard, GotInterpreter name (Err _) ) ->
-            ( Valid games (InvalidProgram name)
-            , Cmd.none
+        ( Valid games Dashboard key, GotInterpreter name (Err _) ) ->
+            ( Valid games (InvalidProgram name) key
+            , Navigation.pushUrl key "/invalid"
             )
 
-        ( Valid games (Playing name oldInterpreter Running), InterpreterMsg interpreterMsg ) ->
+        ( Valid games (Playing name oldInterpreter Running) key, InterpreterMsg interpreterMsg ) ->
             case Interpreter.update interpreterMsg oldInterpreter of
                 Ok ( newInterpreter, interpreterCmd ) ->
-                    ( Valid games (Playing name newInterpreter Running)
+                    ( Valid games (Playing name newInterpreter Running) key
                     , Cmd.map InterpreterMsg interpreterCmd
                     )
 
                 Err error ->
-                    ( Valid games (Playing name oldInterpreter (Crashed error))
+                    ( Valid games (Playing name oldInterpreter (Crashed error)) key
                     , Cmd.none
                     )
 
-        ( Valid games _, BackClicked ) ->
-            ( Valid games Dashboard, Cmd.none )
-
-        ( Valid _ _, LoadGameClicked ) ->
+        ( Valid _ _ _, LoadGameClicked ) ->
             ( model, Select.file [] GameLoaded )
 
-        ( Valid _ _, GameLoaded game ) ->
+        ( Valid _ _ _, GameLoaded game ) ->
             ( model
             , File.toBytes game
                 |> Task.map
@@ -138,8 +140,23 @@ update msg model =
                 |> Task.perform GameDecoded
             )
 
-        ( Valid _ _, GameDecoded (Just game) ) ->
+        ( Valid _ _ _, GameDecoded (Just game) ) ->
             update (GameClicked game) model
+
+        ( Valid games _ key, UrlChanged url ) ->
+            ( if url.path == "/" then
+                Valid games Dashboard key
+
+              else
+                model
+            , Cmd.none
+            )
+
+        ( Valid _ _ key, UrlRequested (Internal url) ) ->
+            ( model, Navigation.pushUrl key (Url.toString url) )
+
+        ( _, UrlRequested (External url) ) ->
+            ( model, Navigation.load url )
 
         _ ->
             ( model, Cmd.none )
@@ -148,7 +165,7 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model of
-        Valid _ (Playing _ interpreter Running) ->
+        Valid _ (Playing _ interpreter Running) _ ->
             Sub.map InterpreterMsg (Interpreter.subscriptions interpreter)
 
         _ ->
@@ -174,7 +191,7 @@ view model =
             , body = skeleton "An error has ocurred" []
             }
 
-        Valid games Dashboard ->
+        Valid games Dashboard _ ->
             { title = appName
             , body =
                 skeleton appName
@@ -191,7 +208,7 @@ view model =
                     ]
             }
 
-        Valid _ (InvalidProgram name) ->
+        Valid _ (InvalidProgram name) _ ->
             { title = name ++ " — " ++ appName
             , body =
                 skeleton "Invalid program"
@@ -200,7 +217,7 @@ view model =
                     ]
             }
 
-        Valid _ (Playing name interpreter status) ->
+        Valid _ (Playing name interpreter status) _ ->
             { title = name ++ " — " ++ appName
             , body =
                 skeleton name
@@ -224,10 +241,7 @@ view model =
 
 viewBack : H.Html Msg
 viewBack =
-    H.p []
-        [ H.a [ HA.href "#", HE.onClick BackClicked ]
-            [ H.text "Go back" ]
-        ]
+    H.p [] [ H.a [ HA.href "/" ] [ H.text "Go back" ] ]
 
 
 viewGame : Game -> H.Html Msg
